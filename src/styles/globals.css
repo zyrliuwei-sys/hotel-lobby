@@ -130,7 +130,37 @@
       transform: translate3d(4%, 6%, 0) scale(1.08);
     }
   }
+  @keyframes badge-marquee {
+    from {
+      transform: translate3d(-50%, 0, 0);
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  .badge-marquee {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 6%,
+      #000 94%,
+      transparent
+    );
+  }
+  .badge-marquee-track {
+    animation: badge-marquee var(--badge-marquee-duration, 60s) linear infinite;
+  }
+  .badge-marquee:hover .badge-marquee-track,
+  .badge-marquee:focus-within .badge-marquee-track {
+    animation-play-state: paused;
+  }
   @media (prefers-reduced-motion: reduce) {
+    .badge-marquee {
+      overflow-x: auto;
+    }
+    .badge-marquee-track {
+      animation: none !important;
+    }
     .animate-drift-a,
     .animate-drift-b,
     .animate-drift-c {

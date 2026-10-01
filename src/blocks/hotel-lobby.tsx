@@ -593,13 +593,13 @@ export function HotelLobbyPage() {
             <span>{envConfigs.app_name}</span>
           </Link>
           <p>{m['hotel.footer.line']()}</p>
-          <FooterBadgeList className="mt-6" />
         </div>
         <div className="hl-footer-links">
           <a href="mailto:support@hotel-lobby.org">support@hotel-lobby.org</a>
           <Link href="/privacy-policy">{m['landing.footer.privacy']()}</Link>
           <Link href="/terms-of-service">{m['landing.footer.terms']()}</Link>
         </div>
+        <FooterBadgeList className="basis-full" />
       </footer>
     </div>
   );

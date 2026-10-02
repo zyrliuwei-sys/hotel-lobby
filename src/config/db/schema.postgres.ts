@@ -635,3 +635,34 @@ export type InviteCode = typeof inviteCode.$inferSelect;
 export type NewInviteCode = typeof inviteCode.$inferInsert;
 export type UserInvite = typeof userInvite.$inferSelect;
 export type NewUserInvite = typeof userInvite.$inferInsert;
+
+// ─── Hotel Lobby free previews ───────────────────────────────────────────────
+// Anonymous, rate-limited scene stills (step 1 of the duet pipeline). The id
+// is the secret handle the browser keeps; animating one links it to a paid
+// ai_task through `taskId`.
+
+export const hotelPreview = table(
+  'hotel_preview',
+  {
+    id: text('id').primaryKey(),
+    ipHash: text('ip_hash').notNull(),
+    deviceId: text('device_id').notNull(),
+    userId: text('user_id'),
+    status: text('status').notNull(),
+    size: text('size').notNull(),
+    quality: text('quality').notNull().default('low'),
+    requestId: text('request_id'),
+    sceneImageUrl: text('scene_image_url'),
+    error: text('error'),
+    taskId: text('task_id'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => [
+    index('idx_hotel_preview_ip').on(t.ipHash, t.createdAt),
+    index('idx_hotel_preview_device').on(t.deviceId, t.createdAt),
+    index('idx_hotel_preview_created').on(t.createdAt),
+  ]
+);
+
+export type HotelPreview = typeof hotelPreview.$inferSelect;
+export type NewHotelPreview = typeof hotelPreview.$inferInsert;

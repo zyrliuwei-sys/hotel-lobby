@@ -864,6 +864,35 @@ export function getSettings(): Setting[] {
       group: 'hotel_lobby',
       tab: 'ai',
     },
+    {
+      name: 'hotel_lobby_free_preview_cap',
+      title: 'Free previews per day (site-wide)',
+      type: 'number',
+      placeholder: '200 (default; 0 = turn free previews off)',
+      group: 'hotel_lobby',
+      tab: 'ai',
+    },
+    {
+      name: 'hotel_lobby_free_preview_per_visitor',
+      title: 'Free previews per visitor per day',
+      type: 'number',
+      placeholder: '1 (default; counted per IP and per device)',
+      group: 'hotel_lobby',
+      tab: 'ai',
+    },
+    {
+      name: 'hotel_lobby_preview_quality',
+      title: 'Free preview image quality',
+      type: 'select',
+      options: [
+        { label: 'Low (~$0.02, default)', value: 'low' },
+        { label: 'Medium (~$0.05)', value: 'medium' },
+        { label: 'High (~$0.15–0.22)', value: 'high' },
+      ],
+      group: 'hotel_lobby',
+      tab: 'ai',
+      defaultValue: 'low',
+    },
 
     // ─── AI / Evolink ────────────────────────────────────────────────
     {

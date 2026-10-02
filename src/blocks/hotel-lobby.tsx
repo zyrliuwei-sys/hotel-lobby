@@ -1,6 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Download, Loader2, Upload, X } from 'lucide-react';
+import {
+  ArrowRight,
+  Check,
+  Copy,
+  Download,
+  Loader2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useSession } from '@/core/auth/client';
@@ -12,7 +20,9 @@ import {
   type DuetSize,
 } from '@/config/hotel-lobby-sizes';
 import { apiGet, apiPost } from '@/lib/api-client';
+import { track } from '@/lib/track';
 import { m } from '@/paraglide/messages.js';
+import { localizeHref } from '@/paraglide/runtime.js';
 import { useUserPermissions } from '@/hooks/use-user-permissions';
 import { Pricing } from '@/blocks/pricing';
 import { FooterBadgeList } from '@/components/footer-badge-list';
@@ -28,6 +38,10 @@ const friendsImage = '/imgs/generated/duet-friends.jpg';
 const siblingsImage = '/imgs/generated/duet-siblings.jpg';
 const coupleImage = '/imgs/generated/duet-couple.jpg';
 
+// Finished duet clips shown under the hero (muted autoplay loops). Drop MP4s
+// into public/videos/examples/ and list them here; the strip hides when empty.
+const exampleVideos: { src: string; poster?: string }[] = [];
+
 const INSUFFICIENT_CREDITS = 'Insufficient credits';
 
 type DuetTask = {
@@ -38,6 +52,109 @@ type DuetTask = {
   videoUrl: string | null;
   error: string | null;
 };
+
+type DuetPreview = {
+  id: string;
+  status: 'pending' | 'success' | 'failed';
+  size: string;
+  imageUrl: string | null;
+  animatedTaskId: string | null;
+  error: string | null;
+};
+
+type FreeQuota = { left: number; reason: string | null };
+
+const FREE_PREVIEW_USED = 'FREE_PREVIEW_USED';
+const FREE_PREVIEW_PAUSED = 'FREE_PREVIEW_PAUSED';
+
+type Saved = { previewId?: string; taskId?: string; at: number };
+const SAVED_KEY = 'hl-duet';
+const SAVED_TTL = 3 * 24 * 60 * 60 * 1000;
+
+function loadSaved(): Saved | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SAVED_KEY) || 'null');
+    return saved && Date.now() - saved.at < SAVED_TTL ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveState(saved: Saved | null) {
+  try {
+    if (saved) localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
+    else localStorage.removeItem(SAVED_KEY);
+  } catch {
+    // Private mode / blocked storage: the flow still works, just not resumable.
+  }
+}
+
+// Free stills are drawn onto a canvas with a tiled watermark, so neither
+// "save image" nor a screenshot yields a clean frame.
+function WatermarkedImage({
+  src,
+  alt,
+  label,
+  onError,
+}: {
+  src: string;
+  alt: string;
+  label: string;
+  onError: () => void;
+}) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = ref.current;
+      if (!canvas) return;
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      const step = Math.max(canvas.width, canvas.height) / 5;
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(-Math.PI / 6);
+      ctx.font = `700 ${Math.round(step / 6)}px sans-serif`;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.32)';
+      ctx.textAlign = 'center';
+      const span = Math.max(canvas.width, canvas.height) * 1.5;
+      const gap = ctx.measureText(label).width + step * 0.6;
+      for (let y = -span, row = 0; y < span; y += step, row++) {
+        for (let x = -span; x < span; x += gap) {
+          ctx.fillText(label, x + (row % 2) * (gap / 2), y);
+        }
+      }
+      ctx.restore();
+    };
+    img.onerror = onError;
+    // Fetched as a blob (not <img src>) so the request is a plain API call;
+    // dev servers treat image-destination requests as static assets.
+    let objectUrl: string | undefined;
+    let cancelled = false;
+    fetch(src)
+      .then((res) => (res.ok ? res.blob() : Promise.reject(res.status)))
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        img.src = objectUrl;
+      })
+      .catch(() => !cancelled && onError());
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [src, label]);
+  return (
+    <canvas
+      ref={ref}
+      role="img"
+      aria-label={alt}
+      onContextMenu={(e) => e.preventDefault()}
+    />
+  );
+}
 
 // Downscale to ≤1536px JPEG so uploads stay small; fal accepts data URIs.
 async function toDataUrl(file: File, maxSide = 1536): Promise<string> {
@@ -100,6 +217,7 @@ export function HotelLobbyPage() {
   const [photoB, setPhotoB] = useState<File | null>(null);
   const [direction, setDirection] = useState('');
   const [size, setSize] = useState<DuetSize>(DEFAULT_DUET_SIZE);
+  const [previewId, setPreviewId] = useState<string>();
   const [taskId, setTaskId] = useState<string>();
   const [consent, setConsent] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -108,6 +226,100 @@ export function HotelLobbyPage() {
   const canGenerate = consent && !!photoA && !!photoB;
   const queryClient = useQueryClient();
   const [paywall, setPaywall] = useState(false);
+
+  // Survive the sign-in / checkout round trip and reloads mid-generation:
+  // the preview and task ids live in localStorage, photos aren't needed again.
+  useEffect(() => {
+    const saved = loadSaved();
+    if (!saved) return;
+    setPreviewId(saved.previewId);
+    setTaskId(saved.taskId);
+    if (Date.now() - saved.at < 2 * 60 * 60 * 1000) {
+      setTimeout(
+        () =>
+          document
+            .getElementById('create')
+            ?.scrollIntoView({ behavior: 'smooth' }),
+        300
+      );
+    }
+  }, []);
+  // Only ever written here; cleared explicitly by `forget` so a (re)mount
+  // with empty state can't wipe what the restore above is about to read.
+  useEffect(() => {
+    if (previewId || taskId) saveState({ previewId, taskId, at: Date.now() });
+  }, [previewId, taskId]);
+  const forget = () => {
+    saveState(null);
+    setTaskId(undefined);
+    setPreviewId(undefined);
+  };
+
+  const quotaQuery = useQuery({
+    queryKey: ['hotel-lobby-free'],
+    queryFn: () => apiGet<FreeQuota>('/api/hotel-lobby/preview'),
+  });
+  const freeLeft = quotaQuery.data?.left ?? 0;
+
+  const makePreview = useMutation({
+    mutationFn: async () =>
+      apiPost<DuetPreview>('/api/hotel-lobby/preview', {
+        photoA: await toDataUrl(photoA!),
+        photoB: await toDataUrl(photoB!),
+        direction: direction.trim() || undefined,
+        size,
+      }),
+    onMutate: () => track('hl_preview_start', { size }),
+    onSuccess: (preview) => {
+      setTaskId(undefined);
+      setPreviewId(preview.id);
+      queryClient.invalidateQueries({ queryKey: ['hotel-lobby-free'] });
+    },
+    onError: (e: Error) => {
+      if (
+        e.message === FREE_PREVIEW_USED ||
+        e.message === FREE_PREVIEW_PAUSED
+      ) {
+        track('hl_preview_limit', { reason: e.message });
+        queryClient.invalidateQueries({ queryKey: ['hotel-lobby-free'] });
+      }
+    },
+  });
+
+  const previewQuery = useQuery({
+    queryKey: ['hotel-lobby-preview', previewId],
+    queryFn: () =>
+      apiGet<DuetPreview>(`/api/hotel-lobby/preview?id=${previewId}`),
+    enabled: !!previewId,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'pending' ? 4000 : false,
+  });
+  const preview = previewQuery.data;
+  useEffect(() => {
+    if (preview?.status === 'success') track('hl_preview_ready');
+    // A preview animated in another tab/session: follow its task.
+    if (preview?.animatedTaskId && !taskId) setTaskId(preview.animatedTaskId);
+  }, [preview?.status, preview?.animatedTaskId]);
+  // Saved id that no longer exists (or expired): forget it quietly.
+  useEffect(() => {
+    if (previewQuery.error) forget();
+  }, [previewQuery.error]);
+
+  const onTaskStarted = (task: DuetTask) => {
+    setTaskId(task.id);
+    track('hl_video_start');
+    queryClient.invalidateQueries({ queryKey: ['credits'] });
+  };
+  const onPaidError = (e: Error) => {
+    if (e.message === INSUFFICIENT_CREDITS) openPaywall();
+  };
+
+  const animate = useMutation({
+    mutationFn: () =>
+      apiPost<DuetTask>('/api/hotel-lobby/animate', { previewId }),
+    onSuccess: onTaskStarted,
+    onError: onPaidError,
+  });
 
   const generate = useMutation({
     mutationFn: async () =>
@@ -118,25 +330,26 @@ export function HotelLobbyPage() {
         size,
       }),
     onSuccess: (task) => {
-      setTaskId(task.id);
-      queryClient.invalidateQueries({ queryKey: ['credits'] });
+      setPreviewId(undefined);
+      onTaskStarted(task);
     },
     // Server is the source of truth: out of credits → show the paywall.
-    onError: (e: Error) => {
-      if (e.message === INSUFFICIENT_CREDITS) setPaywall(true);
-    },
+    onError: onPaidError,
   });
 
   const taskQuery = useQuery({
     queryKey: ['hotel-lobby-task', taskId],
     queryFn: () => apiGet<DuetTask>(`/api/hotel-lobby/task?id=${taskId}`),
-    enabled: !!taskId,
+    enabled: !!taskId && !!user,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return status === 'success' || status === 'failed' ? false : 5000;
     },
   });
   const task = taskQuery.data;
+  useEffect(() => {
+    if (task?.status === 'success') track('hl_video_ready');
+  }, [task?.status]);
   const priceQuery = useQuery({
     queryKey: ['hotel-lobby-price'],
     queryFn: () => apiGet<{ credits: number }>('/api/hotel-lobby/price'),
@@ -148,28 +361,59 @@ export function HotelLobbyPage() {
     enabled: !!user,
   });
   const { data: permissions } = useUserPermissions(!!user);
-  // Pre-check so an unpaid user sees the plans before uploading photos.
-  const startGenerate = () => {
+  const price = priceQuery.data?.credits;
+  const openPaywall = () => {
+    track('hl_paywall_open');
+    setPaywall(true);
+  };
+  // Pre-check so an unpaid user sees the plans before anything is submitted.
+  const lacksCredits = () => {
     const balance = creditsQuery.data?.balance;
-    const price = priceQuery.data?.credits;
-    if (
+    return (
       !permissions?.isAdmin &&
       balance !== undefined &&
       price !== undefined &&
       balance < price
-    ) {
-      setPaywall(true);
-      return;
-    }
+    );
+  };
+  const startGenerate = () => {
+    if (lacksCredits()) return openPaywall();
     generate.mutate();
   };
-  const running =
+  const startAnimate = () => {
+    track('hl_animate_click', { signed_in: user ? 1 : 0 });
+    if (!user) {
+      track('hl_sign_in_prompt');
+      window.location.href = localizeHref(
+        `/sign-in?callbackUrl=${encodeURIComponent('/')}`
+      );
+      return;
+    }
+    if (lacksCredits()) return openPaywall();
+    animate.mutate();
+  };
+
+  const previewReady = preview?.status === 'success' && !taskId;
+  const previewRunning =
+    makePreview.isPending || (!!previewId && preview?.status === 'pending');
+  const taskRunning =
     generate.isPending ||
+    animate.isPending ||
     (!!taskId && task?.status !== 'success' && task?.status !== 'failed');
+  const running = previewRunning || taskRunning;
+  const freeError =
+    makePreview.error?.message === FREE_PREVIEW_USED
+      ? m['hotel.create.free_used']()
+      : makePreview.error?.message === FREE_PREVIEW_PAUSED
+        ? m['hotel.create.free_paused']()
+        : null;
+  const paidError = (e: Error | null) =>
+    e?.message === INSUFFICIENT_CREDITS ? null : e?.message;
   const error =
-    (generate.error?.message === INSUFFICIENT_CREDITS
-      ? null
-      : generate.error?.message) ??
+    paidError(generate.error) ??
+    paidError(animate.error) ??
+    (freeError ? null : makePreview.error?.message) ??
+    (preview?.status === 'failed' && !taskId ? preview.error : null) ??
     (task?.status === 'failed' ? task.error : null) ??
     null;
   // The inline status line is easy to miss below the button; also toast.
@@ -178,8 +422,11 @@ export function HotelLobbyPage() {
   }, [error]);
   const reset = () => {
     generate.reset();
-    setTaskId(undefined);
+    animate.reset();
+    makePreview.reset();
+    forget();
   };
+  const credits = price?.toLocaleString('en-US') ?? '…';
 
   return (
     <div className="hotel-page">
@@ -253,12 +500,36 @@ export function HotelLobbyPage() {
           <div className="hl-hero-copy">
             <p className="hl-kicker">{m['hotel.hero.eyebrow']()}</p>
             <h1>{m['hotel.hero.title']()}</h1>
+            <p className="hl-tagline">{m['hotel.hero.tagline']()}</p>
             <p className="hl-subtitle">{m['hotel.hero.subtitle']()}</p>
             <a href="#create" className="hl-button">
               {m['hotel.hero.cta']()} <ArrowRight size={18} />
             </a>
+            <ul className="hl-trust">
+              <li>{m['hotel.hero.trust_free']()}</li>
+              <li>{m['hotel.hero.trust_time']()}</li>
+              <li>{m['hotel.hero.trust_spec']()}</li>
+              <li>{m['hotel.hero.trust_refund']()}</li>
+            </ul>
           </div>
         </section>
+
+        {exampleVideos.length > 0 && (
+          <section className="hl-examples">
+            {exampleVideos.map((video) => (
+              <video
+                key={video.src}
+                src={video.src}
+                poster={video.poster}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+              />
+            ))}
+          </section>
+        )}
 
         <section className="hl-explainer" aria-labelledby="filter-heading">
           <div className="hl-section-intro">
@@ -266,6 +537,7 @@ export function HotelLobbyPage() {
             <h2 id="filter-heading">{m['hotel.explainer.title']()}</h2>
           </div>
           <div className="hl-prose">
+            <p>{m['hotel.explainer.origin']()}</p>
             <p>{m['hotel.explainer.one']()}</p>
             <p>{m['hotel.explainer.two']()}</p>
             <p>{m['hotel.explainer.three']()}</p>
@@ -343,14 +615,52 @@ export function HotelLobbyPage() {
                 <span>{m['hotel.create.consent']()}</span>
               </label>
               <div className="hl-form-actions">
-                {!user ? (
-                  <Link className="hl-button" href="/sign-in">
-                    {m['hotel.create.sign_in']()} <ArrowRight size={17} />
-                  </Link>
-                ) : task?.status === 'success' || task?.status === 'failed' ? (
+                {task?.status === 'success' || task?.status === 'failed' ? (
                   <button className="hl-button" type="button" onClick={reset}>
                     {m['hotel.create.again']()} <ArrowRight size={17} />
                   </button>
+                ) : previewReady ? (
+                  <>
+                    <button
+                      className={`hl-button ${animate.isPending ? 'hl-disabled' : ''}`}
+                      type="button"
+                      disabled={animate.isPending}
+                      onClick={startAnimate}
+                    >
+                      {animate.isPending && (
+                        <Loader2 size={17} className="animate-spin" />
+                      )}
+                      {user
+                        ? m['hotel.create.animate']({ credits })
+                        : m['hotel.create.animate_sign_in']()}
+                      {!animate.isPending && <ArrowRight size={17} />}
+                    </button>
+                    <button
+                      className="hl-outline"
+                      type="button"
+                      onClick={reset}
+                    >
+                      {m['hotel.create.start_over']()}
+                    </button>
+                  </>
+                ) : freeLeft > 0 && !taskId ? (
+                  <button
+                    className={`hl-button ${!canGenerate || running ? 'hl-disabled' : ''}`}
+                    type="button"
+                    disabled={!canGenerate || running}
+                    onClick={() => makePreview.mutate()}
+                  >
+                    {running && <Loader2 size={17} className="animate-spin" />}
+                    {m['hotel.create.free_preview']()}
+                    {!running && <ArrowRight size={17} />}
+                  </button>
+                ) : !user ? (
+                  <Link
+                    className="hl-button"
+                    href={`/sign-in?callbackUrl=${encodeURIComponent('/')}`}
+                  >
+                    {m['hotel.create.sign_in']()} <ArrowRight size={17} />
+                  </Link>
                 ) : (
                   <button
                     className={`hl-button ${!canGenerate || running ? 'hl-disabled' : ''}`}
@@ -358,9 +668,7 @@ export function HotelLobbyPage() {
                     disabled={!canGenerate || running}
                     onClick={startGenerate}
                   >
-                    {running ? (
-                      <Loader2 size={17} className="animate-spin" />
-                    ) : null}
+                    {running && <Loader2 size={17} className="animate-spin" />}
                     {m['hotel.create.generate']()}
                     {!running && <ArrowRight size={17} />}
                   </button>
@@ -377,28 +685,37 @@ export function HotelLobbyPage() {
                   </a>
                 )}
               </div>
-              {priceQuery.data && (
+              {price !== undefined && !previewReady && (
                 <p className="hl-hint">
-                  {m['hotel.create.cost']({
-                    credits: priceQuery.data.credits.toLocaleString('en-US'),
-                  })}{' '}
+                  {freeLeft > 0 && !previewReady && !taskId
+                    ? `${m['hotel.create.free_note']()} `
+                    : ''}
+                  {m['hotel.create.cost']({ credits })}{' '}
                   <a href="#pricing">{m['hotel.create.buy_credits']()}</a>
                 </p>
               )}
               <p className="hl-hint" role="status" aria-live="polite">
                 {error
                   ? `${m['hotel.create.failed']()}: ${error}`
-                  : task?.status === 'success'
-                    ? m['hotel.create.done']()
-                    : generate.isPending
-                      ? m['hotel.create.submitting']()
-                      : task?.stage === 'motion'
-                        ? `${m['hotel.create.stage_motion']()} ${m['hotel.create.keep_open']()}`
-                        : taskId
-                          ? `${m['hotel.create.stage_scene']()} ${m['hotel.create.keep_open']()}`
-                          : photoA && photoB
-                            ? m['hotel.create.ready']()
-                            : m['hotel.create.hint']()}
+                  : freeError
+                    ? freeError
+                    : task?.status === 'success'
+                      ? m['hotel.create.done']()
+                      : generate.isPending
+                        ? m['hotel.create.submitting']()
+                        : task?.stage === 'motion'
+                          ? `${m['hotel.create.stage_motion']()} ${m['hotel.create.keep_open']()}`
+                          : taskId
+                            ? `${m['hotel.create.stage_scene']()} ${m['hotel.create.keep_open']()}`
+                            : previewReady
+                              ? m['hotel.create.preview_ready']({ credits })
+                              : makePreview.isPending
+                                ? m['hotel.create.submitting']()
+                                : previewRunning
+                                  ? m['hotel.create.preview_working']()
+                                  : photoA && photoB
+                                    ? m['hotel.create.ready']()
+                                    : m['hotel.create.hint']()}
               </p>
             </div>
             <aside className="hl-preview">
@@ -411,9 +728,23 @@ export function HotelLobbyPage() {
                     autoPlay
                     playsInline
                   />
+                ) : task?.sceneImageUrl ? (
+                  <img
+                    src={task.sceneImageUrl}
+                    alt={m['hotel.hero.image_alt']()}
+                    width={1024}
+                    height={1536}
+                  />
+                ) : preview?.imageUrl ? (
+                  <WatermarkedImage
+                    src={preview.imageUrl}
+                    alt={m['hotel.hero.image_alt']()}
+                    label={m['hotel.create.watermark']()}
+                    onError={forget}
+                  />
                 ) : (
                   <img
-                    src={task?.sceneImageUrl ?? previewImage}
+                    src={previewImage}
                     alt={m['hotel.hero.image_alt']()}
                     width={1024}
                     height={1536}
@@ -535,6 +866,7 @@ export function HotelLobbyPage() {
           <div className="hl-prose">
             <p>{m['hotel.prompt.one']()}</p>
             <p>{m['hotel.prompt.two']()}</p>
+            <CopyPrompt />
           </div>
         </section>
 
@@ -601,6 +933,32 @@ export function HotelLobbyPage() {
         </div>
         <FooterBadgeList className="basis-full" />
       </footer>
+    </div>
+  );
+}
+
+function CopyPrompt() {
+  const [copied, setCopied] = useState(false);
+  const text = m['hotel.prompt.copy_text']();
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success(m['hotel.prompt.copied']());
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked: the prompt stays selectable in the block.
+    }
+  };
+
+  return (
+    <div className="hl-copy-prompt">
+      <pre>{text}</pre>
+      <button type="button" className="hl-button" onClick={copy}>
+        {copied ? <Check size={18} /> : <Copy size={18} />}
+        {copied ? m['hotel.prompt.copied']() : m['hotel.prompt.copy']()}
+      </button>
     </div>
   );
 }

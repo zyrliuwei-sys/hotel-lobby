@@ -3,7 +3,6 @@ import { createFileRoute } from '@tanstack/react-router';
 import { AIMediaType, FalProvider } from '@/core/ai';
 import { getAuth } from '@/core/auth';
 import { resolveDuetCredits } from '@/config/hotel-lobby-pricing';
-import { DEFAULT_DUET_SIZE, isDuetSize } from '@/config/hotel-lobby-sizes';
 import {
   AITaskStatus,
   createTask,
@@ -17,15 +16,11 @@ import { respData, respErr } from '@/lib/resp';
 
 import {
   buildScenePrompt,
-  IMAGE_MODEL,
+  parseSceneInput,
   PIPELINE_MODEL,
-  sceneSize,
+  submitScene,
   taskView,
 } from './-pipeline';
-
-// Client downsizes photos before upload; this is a hard ceiling per photo.
-const MAX_PHOTO_CHARS = 8 * 1024 * 1024;
-const PHOTO_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 
 async function POST({ request }: { request: Request }) {
   try {
@@ -34,19 +29,9 @@ async function POST({ request }: { request: Request }) {
     if (!session?.user) return respErr('Unauthorized');
 
     const body = await request.json();
-    const photos = [body?.photoA, body?.photoB];
-    for (const photo of photos) {
-      if (
-        typeof photo !== 'string' ||
-        photo.length > MAX_PHOTO_CHARS ||
-        !PHOTO_RE.test(photo)
-      ) {
-        return respErr('Two JPG, PNG or WebP photos are required');
-      }
-    }
-    const direction =
-      typeof body?.direction === 'string' ? body.direction : undefined;
-    const size = isDuetSize(body?.size) ? body.size : DEFAULT_DUET_SIZE;
+    const input = parseSceneInput(body);
+    if (!input) return respErr('Two JPG, PNG or WebP photos are required');
+    const { photos, direction, size } = input;
 
     const configs = await getAllConfigs();
 
@@ -74,23 +59,8 @@ async function POST({ request }: { request: Request }) {
 
     try {
       const provider = new FalProvider({ apiKey: configs.fal_api_key });
-      const image = await provider.generate({
-        params: {
-          mediaType: AIMediaType.IMAGE,
-          model: IMAGE_MODEL,
-          prompt,
-          options: {
-            image_urls: photos,
-            image_size: sceneSize(size),
-            quality: 'high',
-            output_format: 'jpeg',
-          },
-        },
-      });
-      await mergeTaskInfo(task.id, {
-        imageRequestId: image.taskId,
-        motionVideoUrl,
-      });
+      const imageRequestId = await submitScene(provider, photos, prompt, size);
+      await mergeTaskInfo(task.id, { imageRequestId, motionVideoUrl });
     } catch (error: any) {
       await updateTask({
         taskId: task.id,

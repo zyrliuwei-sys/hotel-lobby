@@ -2,7 +2,7 @@
 
 import { useState, type ComponentType, type SVGProps } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Check } from 'lucide-react';
+import { Check, Gift } from 'lucide-react';
 
 import { apiPost } from '@/lib/api-client';
 import { currentPathWithQuery } from '@/lib/redirect';
@@ -26,6 +26,8 @@ export interface PricingPlan {
   interval?: string;
   featured?: boolean;
   badge?: string;
+  /** Eye-catching callout (e.g. a bonus) shown on an accent ring + banner. */
+  highlight?: string;
   features: PricingFeature[];
   buttonText?: string;
   productId?: string;
@@ -44,6 +46,8 @@ export interface PricingPlan {
 export interface PricingGroup {
   key: string;
   label: string;
+  /** Small accent pill next to the tab label (e.g. a bonus). */
+  badge?: string;
   plans: PricingPlan[];
 }
 
@@ -116,6 +120,11 @@ export function PricingTable({
                 )}
               >
                 {group.label}
+                {group.badge && (
+                  <span className="ml-1.5 rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                    {group.badge}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -138,11 +147,26 @@ export function PricingTable({
             key={plan.id}
             className={cn(
               'border-border relative flex flex-col rounded-2xl border p-8 transition-all',
-              plan.featured
-                ? 'bg-card ring-foreground/10 shadow-md ring-1'
-                : 'bg-background hover:border-foreground/30'
+              plan.highlight
+                ? 'bg-card border-orange-500 shadow-lg ring-2 shadow-orange-500/20 ring-orange-500'
+                : plan.featured
+                  ? 'bg-card ring-foreground/10 shadow-md ring-1'
+                  : 'bg-background hover:border-foreground/30'
             )}
           >
+            {plan.badge && (
+              <span
+                className={cn(
+                  'absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap',
+                  plan.highlight
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-foreground text-background'
+                )}
+              >
+                {plan.badge}
+              </span>
+            )}
+
             {/* Plan name */}
             {plan.name && (
               <p className="text-foreground mb-2 text-sm font-medium">
@@ -174,9 +198,16 @@ export function PricingTable({
               </p>
             )}
 
+            {plan.highlight && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-orange-500/40 bg-orange-500/10 px-3 py-2.5 text-sm font-semibold text-orange-700 dark:text-orange-300">
+                <Gift className="mt-0.5 size-4 shrink-0" />
+                <span>{plan.highlight}</span>
+              </div>
+            )}
+
             {/* CTA — full-width pill */}
             <Button
-              variant={plan.featured ? 'default' : 'outline'}
+              variant={plan.featured || plan.highlight ? 'default' : 'outline'}
               className="h-10 w-full rounded-full text-sm font-medium"
               onClick={() => handleCheckout(plan)}
               disabled={loadingId === plan.id}

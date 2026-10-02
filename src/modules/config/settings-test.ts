@@ -17,6 +17,7 @@ import {
   CreemProvider,
   PayPalProvider,
   StripeProvider,
+  WaffoProvider,
   WechatPayProvider,
 } from '@/core/payment';
 import { PaymentType, type PaymentOrder } from '@/core/payment/types';
@@ -42,6 +43,8 @@ export async function runTest(
         return await testStripe(inputs, configs);
       case 'creem':
         return await testCreem(inputs, configs);
+      case 'waffo':
+        return await testWaffo(inputs, configs);
       case 'paypal':
         return await testPaypal(inputs, configs);
       case 'alipay':
@@ -189,6 +192,42 @@ async function testCreem(
     message: 'Checkout session created',
     details: {
       'Session ID': session.checkoutInfo.sessionId,
+      'Checkout URL': session.checkoutInfo.checkoutUrl,
+    },
+  };
+}
+
+// --- Waffo Pancake --------------------------------------------------------
+
+async function testWaffo(
+  inputs: Record<string, string>,
+  configs: Record<string, string>
+): Promise<TestResult> {
+  const missing = need(configs, ['waffo_merchant_id', 'waffo_private_key']);
+  if (missing) return { success: false, message: missing };
+
+  const provider = new WaffoProvider({
+    merchantId: configs.waffo_merchant_id,
+    privateKey: configs.waffo_private_key,
+    taxCategory: configs.waffo_tax_category || 'saas',
+  });
+
+  const order: PaymentOrder = {
+    type: PaymentType.ONE_TIME,
+    orderNo: getUniSeq('TEST'),
+    productId: inputs.productId,
+    // amount 0 = no price override, the product's stored price is used
+    price: { amount: 0, currency: inputs.currency || 'USD' },
+    successUrl: configuredSuccessUrl('waffo', configs),
+    cancelUrl: configuredSuccessUrl('waffo', configs),
+  };
+
+  const session = await provider.createPayment({ order });
+  return {
+    success: true,
+    message: 'Checkout session created',
+    details: {
+      'Session ID': session.checkoutResult?.sessionId || '',
       'Checkout URL': session.checkoutInfo.checkoutUrl,
     },
   };

@@ -1,7 +1,18 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  like,
+  lt,
+  notLike,
+  or,
+} from 'drizzle-orm';
 
 import { db } from '@/core/db';
-import { aiTask } from '@/config/db/schema';
+import { aiTask, type AiTask } from '@/config/db/schema';
 import { consume, revoke } from '@/modules/credits/service';
 import { getUuid } from '@/lib/hash';
 
@@ -201,4 +212,71 @@ export async function findTask(taskId: string) {
     .where(eq(aiTask.id, taskId))
     .limit(1);
   return result;
+}
+
+/**
+ * Tasks of one model in the given statuses, oldest first — for background
+ * sweeps that advance or clean up unfinished work.
+ */
+export async function listTasksByStatus(params: {
+  model: string;
+  statuses: string[];
+  createdBefore?: Date;
+  resultLike?: string;
+  infoNotLike?: string;
+  limit?: number;
+}) {
+  const {
+    model,
+    statuses,
+    createdBefore,
+    resultLike,
+    infoNotLike,
+    limit = 20,
+  } = params;
+  return db()
+    .select()
+    .from(aiTask)
+    .where(
+      and(
+        eq(aiTask.model, model),
+        inArray(aiTask.status, statuses),
+        createdBefore ? lt(aiTask.createdAt, createdBefore) : undefined,
+        resultLike ? like(aiTask.taskResult, resultLike) : undefined,
+        infoNotLike
+          ? or(isNull(aiTask.taskInfo), notLike(aiTask.taskInfo, infoNotLike))
+          : undefined,
+        isNull(aiTask.deletedAt)
+      )
+    )
+    .orderBy(aiTask.createdAt)
+    .limit(limit);
+}
+
+/**
+ * One page of a user's tasks for a model, newest first, with the total.
+ */
+export async function getUserTasksPage(params: {
+  userId: string;
+  model: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const { userId, model, page = 1, pageSize = 12 } = params;
+  const where = and(
+    eq(aiTask.userId, userId),
+    eq(aiTask.model, model),
+    isNull(aiTask.deletedAt)
+  );
+  const [items, totals] = await Promise.all([
+    db()
+      .select()
+      .from(aiTask)
+      .where(where)
+      .orderBy(desc(aiTask.createdAt))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize),
+    db().select({ n: count() }).from(aiTask).where(where),
+  ]);
+  return { items: items as AiTask[], total: Number(totals[0]?.n ?? 0) };
 }

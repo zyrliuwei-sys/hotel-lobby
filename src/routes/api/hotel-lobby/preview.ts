@@ -16,10 +16,10 @@ import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr } from '@/lib/resp';
 
 import {
+  advancePreview,
   buildScenePrompt,
   isSceneQuality,
   parseSceneInput,
-  queryScene,
   submitScene,
 } from './-pipeline';
 import {
@@ -104,21 +104,8 @@ async function GET({ request }: { request: Request }) {
     if (!row) return respErr('Preview not found');
 
     if (row.status === PreviewStatus.PENDING && row.requestId) {
-      try {
-        const provider = new FalProvider({ apiKey: configs.fal_api_key });
-        const url = await queryScene(provider, row.requestId);
-        if (url) {
-          await updatePreview(id, {
-            status: PreviewStatus.SUCCESS,
-            sceneImageUrl: url,
-          });
-        }
-      } catch (error: any) {
-        await updatePreview(id, {
-          status: PreviewStatus.FAILED,
-          error: error?.message || 'Preview failed',
-        });
-      }
+      const provider = new FalProvider({ apiKey: configs.fal_api_key });
+      await advancePreview(row, provider);
       row = (await findPreview(id))!;
     }
 

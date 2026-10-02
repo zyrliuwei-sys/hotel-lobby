@@ -42,6 +42,7 @@ function usd(cents: number) {
 const ALL_PROVIDERS: PaymentProvider[] = [
   'stripe',
   'creem',
+  'waffo',
   'paypal',
   'alipay',
   'wechat',
@@ -105,6 +106,7 @@ export function Pricing({
       description: string;
       featured?: boolean;
       badge?: string;
+      highlight?: string;
       extra?: PricingFeature[];
       originalPrice?: string;
     }
@@ -126,6 +128,7 @@ export function Pricing({
       interval: interval ? m['landing.pricing.per_month']() : undefined,
       featured: opts.featured,
       badge: opts.badge,
+      highlight: opts.highlight,
       features: features(product.credits, opts.extra ?? []),
       productId,
       priceInCents: product.priceInCents,
@@ -177,10 +180,13 @@ export function Pricing({
     {
       key: 'one-time',
       label: m['landing.pricing.one_time'](),
+      badge: m['landing.pricing.first_order_tab'](),
       plans: [
         plan('pack_starter', {
           name: m['landing.pricing.pack_starter'](),
           description: m['landing.pricing.pack_desc'](),
+          badge: m['landing.pricing.first_order_badge'](),
+          highlight: m['landing.pricing.first_order_bonus'](),
           extra: packExtra,
         }),
         plan('pack_standard', {

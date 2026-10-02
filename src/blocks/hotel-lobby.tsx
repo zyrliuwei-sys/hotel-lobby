@@ -674,15 +674,18 @@ export function HotelLobbyPage() {
                   </button>
                 )}
                 {task?.videoUrl && (
-                  <a
-                    className="hl-outline"
-                    href={task.videoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download
-                  >
-                    {m['hotel.create.download']()} <Download size={17} />
-                  </a>
+                  <>
+                    <a
+                      className="hl-outline"
+                      href={`/api/hotel-lobby/download?id=${task.id}`}
+                      download
+                    >
+                      {m['hotel.create.download']()} <Download size={17} />
+                    </a>
+                    <Link className="hl-outline" href="/settings/videos">
+                      {m['hotel.create.my_videos']()}
+                    </Link>
+                  </>
                 )}
               </div>
               {price !== undefined && !previewReady && (

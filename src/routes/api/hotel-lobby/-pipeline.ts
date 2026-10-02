@@ -8,6 +8,11 @@
  * The task row's status doubles as the stage: `pending` = scene image in
  * flight, `processing` = motion transfer in flight. Moving pending→processing
  * is claimed atomically so concurrent polls never submit step 2 twice.
+ *
+ * Polls come from the browser while the page is open and from the
+ * every-minute cron sweep (`/api/hotel-lobby/cron`), so a task finishes even
+ * if the buyer closes the tab. Finished videos are copied to R2 because fal
+ * media URLs are temporary.
  */
 
 import { AIMediaType, FalProvider, AITaskStatus as FalStatus } from '@/core/ai';
@@ -24,6 +29,12 @@ import {
   mergeTaskInfo,
   updateTask,
 } from '@/modules/ai-tasks/service';
+import {
+  PreviewStatus,
+  updatePreview,
+  type findPreview,
+} from '@/modules/hotel-preview/service';
+import { getStorage } from '@/modules/storage/service';
 
 export const IMAGE_MODEL = 'openai/gpt-image-2/edit';
 export const VIDEO_MODEL = 'fal-ai/bytedance/dreamactor/v2';
@@ -164,6 +175,7 @@ type Info = {
   sceneImageUrl?: string;
   motionVideoUrl?: string;
   error?: string;
+  persistAttempts?: number;
 };
 
 function parseJson<T>(value: unknown): T {
@@ -192,6 +204,72 @@ export function taskView(task: any) {
     videoUrl: result.video?.url ?? null,
     error: result.error ?? info.error ?? null,
   };
+}
+
+function isFalUrl(url: string) {
+  try {
+    return new URL(url).hostname.endsWith('fal.media');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Copy a finished fal video to R2 and return the task result pointing at the
+ * permanent copy (the fal URL is kept as `falUrl`). Returns the result
+ * unchanged when storage isn't configured or the copy fails — the video stays
+ * playable from fal until a later sweep retries.
+ */
+export async function persistVideo(taskId: string, taskResult: any) {
+  const url: string | undefined = taskResult?.video?.url;
+  if (!url || !isFalUrl(url)) return taskResult;
+  try {
+    const storage = await getStorage();
+    if (!storage) return taskResult;
+    const uploaded = await storage.downloadAndUpload({
+      url,
+      key: `hotel-lobby/videos/${taskId}.mp4`,
+      contentType: 'video/mp4',
+      disposition: 'inline',
+    });
+    if (!uploaded.success || !uploaded.url) {
+      console.error('persistVideo failed', taskId, uploaded.error);
+      return taskResult;
+    }
+    return {
+      ...taskResult,
+      video: { ...taskResult.video, url: uploaded.url, falUrl: url },
+    };
+  } catch (error) {
+    console.error('persistVideo failed', taskId, error);
+    return taskResult;
+  }
+}
+
+/**
+ * Retry the R2 copy for an already-finished task (backfill / earlier copy
+ * failed). Gives up after a few tries so an expired fal URL isn't retried
+ * forever.
+ */
+export async function repersistTask(task: {
+  id: string;
+  taskInfo: unknown;
+  taskResult: unknown;
+}) {
+  const info = parseJson<Info>(task.taskInfo);
+  const attempts = info.persistAttempts ?? 0;
+  // No storage (e.g. local dev without the R2 key) isn't a failed try.
+  if (attempts >= 3 || !(await getStorage())) return false;
+  await mergeTaskInfo(task.id, { persistAttempts: attempts + 1 });
+  const result = parseJson<any>(task.taskResult);
+  const stored = await persistVideo(task.id, result);
+  if (stored === result) return false;
+  await updateTask({
+    taskId: task.id,
+    status: AITaskStatus.SUCCESS,
+    taskResult: stored,
+  });
+  return true;
 }
 
 async function fail(taskId: string, message: string) {
@@ -254,7 +332,7 @@ export async function advance(taskId: string, provider: FalProvider) {
         await updateTask({
           taskId,
           status: AITaskStatus.SUCCESS,
-          taskResult: res.taskResult,
+          taskResult: await persistVideo(taskId, res.taskResult),
         });
       }
     }
@@ -265,4 +343,25 @@ export async function advance(taskId: string, provider: FalProvider) {
 
   task = await findTask(taskId);
   return taskView(task);
+}
+
+type PreviewRow = NonNullable<Awaited<ReturnType<typeof findPreview>>>;
+
+/** Advance a pending free preview by one poll (browser or cron sweep). */
+export async function advancePreview(row: PreviewRow, provider: FalProvider) {
+  if (row.status !== PreviewStatus.PENDING || !row.requestId) return;
+  try {
+    const url = await queryScene(provider, row.requestId);
+    if (url) {
+      await updatePreview(row.id, {
+        status: PreviewStatus.SUCCESS,
+        sceneImageUrl: url,
+      });
+    }
+  } catch (error: any) {
+    await updatePreview(row.id, {
+      status: PreviewStatus.FAILED,
+      error: error?.message || 'Preview failed',
+    });
+  }
 }

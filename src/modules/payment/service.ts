@@ -7,6 +7,7 @@ import {
   PaymentManager,
   PayPalProvider,
   StripeProvider,
+  WaffoProvider,
   WechatPayProvider,
 } from '@/core/payment';
 import {
@@ -54,6 +55,10 @@ async function getPaymentManager(): Promise<PaymentManager> {
     c('stripe_secret_key') || c('stripe_api_key'),
     c('creem_enabled'),
     c('creem_api_key'),
+    c('waffo_enabled'),
+    c('waffo_merchant_id'),
+    c('waffo_private_key'),
+    c('waffo_tax_category'),
     c('alipay_app_id'),
     c('wechat_mch_id'),
     c('paypal_enabled'),
@@ -94,6 +99,22 @@ async function getPaymentManager(): Promise<PaymentManager> {
         signingSecret: c('creem_signing_secret') || undefined,
         environment:
           c('creem_environment') === 'production' ? 'production' : 'sandbox',
+      }),
+      isDefault
+    );
+  }
+
+  if (
+    c('waffo_enabled') === 'true' &&
+    c('waffo_merchant_id') &&
+    c('waffo_private_key')
+  ) {
+    const isDefault = c('default_payment_provider') === 'waffo';
+    manager.addProvider(
+      new WaffoProvider({
+        merchantId: c('waffo_merchant_id'),
+        privateKey: c('waffo_private_key'),
+        taxCategory: c('waffo_tax_category') || 'saas',
       }),
       isDefault
     );
@@ -179,8 +200,11 @@ export async function createCheckout(params: {
   // Resolve provider-specific product ID (e.g. Creem product_ids_mapping)
   const resolvedProvider = provider || pm.getDefaultProvider()?.name;
   let resolvedProductId = paymentOrder.productId;
-  if (resolvedProvider === 'creem' && paymentOrder.productId) {
-    const mapping = configs.creem_product_ids_mapping;
+  if (
+    (resolvedProvider === 'creem' || resolvedProvider === 'waffo') &&
+    paymentOrder.productId
+  ) {
+    const mapping = configs[`${resolvedProvider}_product_ids_mapping`];
     if (mapping) {
       try {
         const map = JSON.parse(mapping) as Record<string, string>;

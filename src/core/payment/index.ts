@@ -129,3 +129,4 @@ export * from './creem';
 export * from './paypal';
 export * from './alipay';
 export * from './wechat';
+export * from './waffo';

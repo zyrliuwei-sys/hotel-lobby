@@ -3,7 +3,7 @@
  * per day plus a site-wide daily cap that bounds the fal bill.
  */
 
-import { and, count, eq, gte, isNull, ne, or } from 'drizzle-orm';
+import { and, asc, count, eq, gte, isNull, ne, or } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { hotelPreview, type HotelPreview } from '@/config/db/schema';
@@ -100,4 +100,14 @@ export async function claimPreview(id: string, userId: string, taskId: string) {
     .where(and(eq(hotelPreview.id, id), isNull(hotelPreview.taskId)))
     .returning({ id: hotelPreview.id });
   return rows.length > 0;
+}
+
+/** Pending previews, oldest first, for the background sweep. */
+export async function listPendingPreviews(limit = 20) {
+  return db()
+    .select()
+    .from(hotelPreview)
+    .where(eq(hotelPreview.status, PreviewStatus.PENDING))
+    .orderBy(asc(hotelPreview.createdAt))
+    .limit(limit);
 }

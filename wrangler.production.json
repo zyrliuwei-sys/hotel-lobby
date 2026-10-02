@@ -19,5 +19,6 @@
       "migrations_dir": "drizzle"
     }
   ],
+  "triggers": { "crons": ["* * * * *"] },
   "routes": [{ "pattern": "hotel-lobby.org", "custom_domain": true }]
 }

@@ -32,6 +32,7 @@ import { Switch } from '@/components/ui/switch';
 function AdminSettingsPage() {
   const placeholders: Record<string, string> = {
     creem_test_amount: m['admin.settings.placeholders.creem_test_amount'](),
+    waffo_test_amount: m['admin.settings.placeholders.waffo_test_amount'](),
     paypal_test_amount: m['admin.settings.placeholders.paypal_test_amount'](),
     alipay_test_amount: m['admin.settings.placeholders.alipay_test_amount'](),
     wechat_test_amount: m['admin.settings.placeholders.wechat_test_amount'](),

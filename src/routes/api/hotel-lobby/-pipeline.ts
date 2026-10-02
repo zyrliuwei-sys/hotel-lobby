@@ -216,7 +216,8 @@ function isFalUrl(url: string) {
 
 /**
  * Copy a finished fal video to R2 and return the task result pointing at the
- * permanent copy (the fal URL is kept as `falUrl`). Returns the result
+ * permanent copy. The fal URL is dropped so the `%fal.media%` backfill sweep
+ * only matches videos that still need copying. Returns the result
  * unchanged when storage isn't configured or the copy fails — the video stays
  * playable from fal until a later sweep retries.
  */
@@ -238,7 +239,7 @@ export async function persistVideo(taskId: string, taskResult: any) {
     }
     return {
       ...taskResult,
-      video: { ...taskResult.video, url: uploaded.url, falUrl: url },
+      video: { ...taskResult.video, url: uploaded.url },
     };
   } catch (error) {
     console.error('persistVideo failed', taskId, error);

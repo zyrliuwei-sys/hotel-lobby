@@ -53,12 +53,19 @@ export interface PricingGroup {
 
 export function PricingTable({
   groups,
+  defaultGroup,
   onCheckout,
 }: {
   groups: PricingGroup[];
+  /** Key of the tab shown first; falls back to the first group. */
+  defaultGroup?: string;
   onCheckout?: (plan: PricingPlan) => void;
 }) {
-  const [activeGroup, setActiveGroup] = useState(groups[0]?.key || '');
+  const [activeGroup, setActiveGroup] = useState(
+    defaultGroup && groups.some((g) => g.key === defaultGroup)
+      ? defaultGroup
+      : groups[0]?.key || ''
+  );
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const currentGroup = groups.find((g) => g.key === activeGroup) || groups[0];

@@ -163,7 +163,7 @@ export function Pricing({
   ] as const;
 
   const groups: PricingGroup[] = [
-    // Monthly first — it's the tab shown by default.
+    // One-time is the tab shown by default (see defaultGroup below).
     {
       key: 'monthly',
       label: m['landing.pricing.monthly'](),
@@ -312,7 +312,11 @@ export function Pricing({
             })}
           </p>
         </div>
-        <PricingTable groups={groups} onCheckout={handleCheckout} />
+        <PricingTable
+          groups={groups}
+          defaultGroup="one-time"
+          onCheckout={handleCheckout}
+        />
       </div>
 
       <PaymentProviderModal

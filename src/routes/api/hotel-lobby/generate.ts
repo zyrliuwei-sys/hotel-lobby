@@ -14,6 +14,7 @@ import { getBalance } from '@/modules/credits/service';
 import { hasPermission } from '@/modules/rbac/service';
 import { respData, respErr } from '@/lib/resp';
 
+import { DIRECTION_BLOCKED, isBlockedDirection } from './-direction-filter';
 import {
   buildScenePrompt,
   parseSceneInput,
@@ -31,6 +32,9 @@ async function POST({ request }: { request: Request }) {
     const body = await request.json();
     const input = parseSceneInput(body);
     if (!input) return respErr('Two JPG, PNG or WebP photos are required');
+    if (isBlockedDirection(input.direction)) {
+      return respErr(DIRECTION_BLOCKED);
+    }
     const { photos, direction, size } = input;
 
     const configs = await getAllConfigs();

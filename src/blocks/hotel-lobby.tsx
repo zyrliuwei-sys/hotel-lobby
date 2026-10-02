@@ -66,6 +66,7 @@ type FreeQuota = { left: number; reason: string | null };
 
 const FREE_PREVIEW_USED = 'FREE_PREVIEW_USED';
 const FREE_PREVIEW_PAUSED = 'FREE_PREVIEW_PAUSED';
+const DIRECTION_BLOCKED = 'DIRECTION_BLOCKED';
 
 type Saved = { previewId?: string; taskId?: string; at: number };
 const SAVED_KEY = 'hl-duet';
@@ -409,7 +410,12 @@ export function HotelLobbyPage() {
         : null;
   const paidError = (e: Error | null) =>
     e?.message === INSUFFICIENT_CREDITS ? null : e?.message;
+  const blockedNote =
+    [generate.error, makePreview.error].some(
+      (e) => e?.message === DIRECTION_BLOCKED
+    ) && m['hotel.create.direction_blocked']();
   const error =
+    (blockedNote || null) ??
     paidError(generate.error) ??
     paidError(animate.error) ??
     (freeError ? null : makePreview.error?.message) ??

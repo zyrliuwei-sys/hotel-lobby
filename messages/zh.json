@@ -1040,5 +1040,6 @@
   "settings.videos.next": "下一页",
   "landing.pricing.first_order_badge": "首单加送 1 个视频",
   "landing.pricing.first_order_bonus": "首单赠送 1 个视频：付 $5 共得 2 个视频",
-  "landing.pricing.first_order_tab": "送 1 个视频"
+  "landing.pricing.first_order_tab": "送 1 个视频",
+  "hotel.create.direction_blocked": "这条造型要求不被允许。请保持内容健康，不要包含性暗示或色情内容。"
 }

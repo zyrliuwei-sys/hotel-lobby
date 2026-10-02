@@ -15,6 +15,7 @@ import { hasPermission } from '@/modules/rbac/service';
 import { enforceMinIntervalRateLimit } from '@/lib/rate-limit';
 import { respData, respErr } from '@/lib/resp';
 
+import { DIRECTION_BLOCKED, isBlockedDirection } from './-direction-filter';
 import {
   advancePreview,
   buildScenePrompt,
@@ -125,6 +126,9 @@ async function POST({ request }: { request: Request }) {
   try {
     const input = parseSceneInput(await request.json());
     if (!input) return respErr('Two JPG, PNG or WebP photos are required');
+    if (isBlockedDirection(input.direction)) {
+      return respErr(DIRECTION_BLOCKED);
+    }
 
     const configs = await getAllConfigs();
     const ids = visitor(request);

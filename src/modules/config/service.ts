@@ -61,7 +61,24 @@ export async function getDbConfigs(): Promise<ConfigMap> {
  */
 export async function getAllConfigs(): Promise<ConfigMap> {
   const dbConfigs = await getDbConfigs();
-  return { ...envConfigs, ...dbConfigs };
+  return { ...envConfigs, ...dbConfigs, ...getDevConfigOverrides() };
+}
+
+/**
+ * Dev-only overrides: `CFG_<SETTING_NAME>=value` in .env.development wins
+ * over the database (e.g. CFG_WAFFO_ENABLED=true → waffo_enabled). Lets a
+ * local server test providers without editing the shared production config.
+ * Ignored in production builds.
+ */
+function getDevConfigOverrides(): ConfigMap {
+  if (!import.meta.env.DEV || typeof process === 'undefined') return {};
+  const result: ConfigMap = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key.startsWith('CFG_') && value !== undefined) {
+      result[key.slice(4).toLowerCase()] = value;
+    }
+  }
+  return result;
 }
 
 /**

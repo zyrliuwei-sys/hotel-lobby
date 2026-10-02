@@ -14,6 +14,7 @@ import { AIMediaType, FalProvider, AITaskStatus as FalStatus } from '@/core/ai';
 import {
   DEFAULT_DUET_SIZE,
   DUET_SIZES,
+  isDuetSize,
   type DuetSize,
 } from '@/config/hotel-lobby-sizes';
 import {
@@ -48,9 +49,113 @@ export function buildScenePrompt(
     : base;
 }
 
+// Client downsizes photos before upload; this is a hard ceiling per photo.
+const MAX_PHOTO_CHARS = 8 * 1024 * 1024;
+const PHOTO_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
+
+/** Validate a scene request body; null when the photos are missing/invalid. */
+export function parseSceneInput(body: any) {
+  const photos = [body?.photoA, body?.photoB];
+  for (const photo of photos) {
+    if (
+      typeof photo !== 'string' ||
+      photo.length > MAX_PHOTO_CHARS ||
+      !PHOTO_RE.test(photo)
+    ) {
+      return null;
+    }
+  }
+  return {
+    photos: photos as string[],
+    direction:
+      typeof body?.direction === 'string'
+        ? (body.direction as string)
+        : undefined,
+    size: isDuetSize(body?.size) ? body.size : DEFAULT_DUET_SIZE,
+  };
+}
+
 export function sceneSize(size: DuetSize = DEFAULT_DUET_SIZE) {
   const { width, height } = DUET_SIZES[size];
   return { width, height };
+}
+
+export type SceneQuality = 'low' | 'medium' | 'high';
+
+export function isSceneQuality(value: unknown): value is SceneQuality {
+  return value === 'low' || value === 'medium' || value === 'high';
+}
+
+// Turns a cheap free-preview still into the full-quality frame the video is
+// made from, without re-composing it — the buyer gets the scene they saw.
+export const REFINE_PROMPT = `Re-render this exact image at high quality.
+Keep the same two people with the same faces, hairstyles, clothing, poses and left/right positions, the same hanging microphone, framing and burnt-orange background.
+Only increase detail, sharpness and lighting quality. Do not add, remove or move anything.`;
+
+/** Step 1: two portraits → one orange-booth scene. Returns the fal id. */
+export async function submitScene(
+  provider: FalProvider,
+  photos: string[],
+  prompt: string,
+  size: DuetSize,
+  quality: SceneQuality = 'high'
+) {
+  const image = await provider.generate({
+    params: {
+      mediaType: AIMediaType.IMAGE,
+      model: IMAGE_MODEL,
+      prompt,
+      options: {
+        image_urls: photos,
+        image_size: sceneSize(size),
+        quality,
+        output_format: 'jpeg',
+      },
+    },
+  });
+  return image.taskId;
+}
+
+/** Poll step 1. Resolves the scene URL once ready, null while running. */
+export async function queryScene(provider: FalProvider, requestId: string) {
+  const res = await provider.query({
+    taskId: requestId,
+    model: IMAGE_MODEL,
+    mediaType: AIMediaType.IMAGE,
+  });
+  if (res.taskStatus === FalStatus.FAILED) {
+    throw new Error('Scene image generation failed');
+  }
+  if (res.taskStatus !== FalStatus.SUCCESS) return null;
+  const url = res.taskInfo?.images?.[0]?.imageUrl;
+  if (!url) throw new Error('Scene image generation returned no image');
+  return url as string;
+}
+
+/**
+ * Step 2: scene + reference performance → video. The caller must already
+ * have moved the task to `processing`.
+ */
+export async function submitMotion(
+  taskId: string,
+  provider: FalProvider,
+  sceneImageUrl: string,
+  motionVideoUrl: string
+) {
+  await mergeTaskInfo(taskId, { sceneImageUrl, motionVideoUrl });
+  const video = await provider.generate({
+    params: {
+      mediaType: AIMediaType.VIDEO,
+      model: VIDEO_MODEL,
+      prompt: '',
+      options: {
+        image_url: sceneImageUrl,
+        video_url: motionVideoUrl,
+        trim_first_second: true,
+      },
+    },
+  });
+  await mergeTaskInfo(taskId, { videoRequestId: video.taskId });
 }
 
 type Info = {
@@ -126,20 +231,12 @@ export async function advance(taskId: string, provider: FalProvider) {
             AITaskStatus.PROCESSING
           )
         ) {
-          await mergeTaskInfo(taskId, { sceneImageUrl });
-          const video = await provider.generate({
-            params: {
-              mediaType: AIMediaType.VIDEO,
-              model: VIDEO_MODEL,
-              prompt: '',
-              options: {
-                image_url: sceneImageUrl,
-                video_url: info.motionVideoUrl,
-                trim_first_second: true,
-              },
-            },
-          });
-          await mergeTaskInfo(taskId, { videoRequestId: video.taskId });
+          await submitMotion(
+            taskId,
+            provider,
+            sceneImageUrl,
+            info.motionVideoUrl!
+          );
         }
       }
     }

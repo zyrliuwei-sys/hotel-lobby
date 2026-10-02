@@ -18,6 +18,7 @@ import { duetCredits } from '@/config/hotel-lobby-pricing';
 import { pricingCatalog } from '@/config/pricing';
 import { apiGet, apiPost } from '@/lib/api-client';
 import { currentPathWithQuery } from '@/lib/redirect';
+import { track } from '@/lib/track';
 import { m } from '@/paraglide/messages.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
 import {
@@ -236,6 +237,10 @@ export function Pricing({
   });
 
   function startCheckout(plan: PricingPlan, provider?: PaymentProvider) {
+    track('begin_checkout', {
+      plan: plan.productId ?? '',
+      value: (plan.priceInCents ?? 0) / 100,
+    });
     setLoadingProvider(provider ?? null);
     checkoutMutation.mutate({ plan, provider });
   }

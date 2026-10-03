@@ -358,6 +358,19 @@ export function HotelLobbyPage() {
       );
     }
   }, []);
+  // Arriving at /#create (e.g. straight after sign-in / sign-up): the browser's
+  // own anchor jump fires before images settle the layout, so scroll again.
+  useEffect(() => {
+    if (window.location.hash !== '#create') return;
+    const timer = setTimeout(
+      () =>
+        document
+          .getElementById('create')
+          ?.scrollIntoView({ behavior: 'smooth' }),
+      300
+    );
+    return () => clearTimeout(timer);
+  }, []);
   // Restore the unsent form, then keep it saved. `draftReady` stops the save
   // effect from overwriting the draft with the empty initial state.
   const [draftReady, setDraftReady] = useState(false);
@@ -547,7 +560,7 @@ export function HotelLobbyPage() {
       track('hl_sign_in_prompt');
       resumeAnimate(previewId);
       window.location.href = localizeHref(
-        `/sign-up?callbackUrl=${encodeURIComponent('/')}`
+        `/sign-up?callbackUrl=${encodeURIComponent('/#create')}`
       );
       return;
     }
@@ -917,7 +930,7 @@ export function HotelLobbyPage() {
                 ) : !user ? (
                   <Link
                     className="hl-button"
-                    href={`/sign-up?callbackUrl=${encodeURIComponent('/')}`}
+                    href={`/sign-up?callbackUrl=${encodeURIComponent('/#create')}`}
                   >
                     {m['hotel.create.sign_in']()} <ArrowRight size={17} />
                   </Link>

@@ -4,6 +4,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { signOut, useSession } from '@/core/auth/client';
 import { useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
+import { AFTER_AUTH_HOME } from '@/lib/redirect';
 import { m } from '@/paraglide/messages.js';
 import { localizeHref } from '@/paraglide/runtime.js';
 import { Button } from '@/components/ui/button';
@@ -37,7 +38,7 @@ function RedeemInvitePage() {
       .then((res) => {
         if (cancelled) return;
         if (res.code === 0 && !res.data?.needsInvite) {
-          router.push('/settings');
+          router.push(AFTER_AUTH_HOME);
         } else {
           setChecking(false);
         }
@@ -81,7 +82,7 @@ function RedeemInvitePage() {
       }
 
       // Hard navigation so the new plan/membership is reflected everywhere.
-      window.location.assign(localizeHref('/settings'));
+      window.location.assign(localizeHref(AFTER_AUTH_HOME));
     } catch (err: any) {
       setError(err?.message || m['common.sign.invite_code_invalid']());
       setLoading(false);

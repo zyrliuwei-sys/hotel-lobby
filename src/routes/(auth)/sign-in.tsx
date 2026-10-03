@@ -6,7 +6,11 @@ import { z } from 'zod';
 import { authClient, signIn, useSession } from '@/core/auth/client';
 import { Link, useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
-import { resolveAfterAuthUrl, safeInternalPath } from '@/lib/redirect';
+import {
+  AFTER_AUTH_HOME,
+  resolveAfterAuthUrl,
+  safeInternalPath,
+} from '@/lib/redirect';
 import { m } from '@/paraglide/messages.js';
 import { localizeHref } from '@/paraglide/runtime.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
@@ -62,7 +66,7 @@ function SignInPage() {
   const afterLoginUrl = resolveAfterAuthUrl({
     redirect: redirectParam,
     callbackUrl,
-    fallback: '/settings',
+    fallback: AFTER_AUTH_HOME,
   });
 
   // Carry callbackUrl/redirect across to sign-up so the destination survives the switch.

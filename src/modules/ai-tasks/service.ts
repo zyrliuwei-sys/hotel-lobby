@@ -39,10 +39,32 @@ export async function createTask(params: {
   const { userId, mediaType, provider, model, prompt, costCredits, options } =
     params;
 
+  // Charge before inserting: on D1 `transaction` is not isolated and never
+  // rolls back, so inserting first left an orphan pending task behind every
+  // "Insufficient credits" race.
   return db().transaction(async (tx: any) => {
-    // 1. Insert task
+    const id = getUuid();
+    let creditId: string | undefined;
+
+    if (costCredits && costCredits > 0) {
+      const result = await consume({
+        userId,
+        credits: costCredits,
+        scene: 'ai_task',
+        description: `AI ${mediaType} generation`,
+        metadata: JSON.stringify({ taskId: id }),
+        tx,
+      });
+
+      if (!result.success) {
+        throw new Error('Insufficient credits');
+      }
+      // Stored for revocation if the task fails
+      creditId = result.consumedCredit?.id;
+    }
+
     const taskData: any = {
-      id: getUuid(),
+      id,
       userId,
       mediaType,
       provider,
@@ -50,36 +72,10 @@ export async function createTask(params: {
       prompt,
       status: AITaskStatus.PENDING,
       costCredits: costCredits || 0,
+      taskInfo: creditId ? JSON.stringify({ creditId }) : null,
     };
 
     const [task] = await tx.insert(aiTask).values(taskData).returning();
-
-    // 2. Consume credits if cost > 0
-    if (costCredits && costCredits > 0) {
-      const result = await consume({
-        userId,
-        credits: costCredits,
-        scene: 'ai_task',
-        description: `AI ${mediaType} generation`,
-        metadata: JSON.stringify({ taskId: task.id }),
-        tx,
-      });
-
-      if (!result.success) {
-        throw new Error('Insufficient credits');
-      }
-
-      // Store consumed credit ID for potential revocation
-      if (result.consumedCredit) {
-        await tx
-          .update(aiTask)
-          .set({
-            taskInfo: JSON.stringify({ creditId: result.consumedCredit.id }),
-          })
-          .where(eq(aiTask.id, task.id));
-      }
-    }
-
     return task;
   });
 }

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, isNull, or, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, isNull, or, sql, sum } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { credit } from '@/config/db/schema';
@@ -173,10 +173,19 @@ export async function consume(params: {
         if (remainingToConsume <= 0) break;
         const toConsume = Math.min(remainingToConsume, item.remainingCredits);
 
-        await tx
+        // Conditional decrement: two generations started at once both read
+        // the same balance (D1 has no isolated transactions), so a plain
+        // `set remaining = <read value> - n` would charge only one of them.
+        const taken = await tx
           .update(credit)
-          .set({ remainingCredits: item.remainingCredits - toConsume })
-          .where(eq(credit.id, item.id));
+          .set({
+            remainingCredits: sql`${credit.remainingCredits} - ${toConsume}`,
+          })
+          .where(
+            and(eq(credit.id, item.id), gte(credit.remainingCredits, toConsume))
+          )
+          .returning({ id: credit.id });
+        if (!taken.length) continue;
 
         consumedItems.push({
           creditId: item.id,
@@ -190,6 +199,19 @@ export async function consume(params: {
       }
 
       batchNo++;
+    }
+
+    // Lost a race for the last credits: give back what this call took.
+    if (remainingToConsume > 0) {
+      for (const item of consumedItems) {
+        await tx
+          .update(credit)
+          .set({
+            remainingCredits: sql`${credit.remainingCredits} + ${item.creditsConsumed}`,
+          })
+          .where(eq(credit.id, item.creditId));
+      }
+      return { success: false };
     }
 
     // 3. Create consumption record
@@ -235,6 +257,21 @@ export async function revoke(consumeCreditId: string) {
 
   const items = JSON.parse(consumeRecord.consumedDetail);
 
+  // Claim the record before refunding: a failing task can be failed by the
+  // browser poll and the cron sweep at the same moment, and both would
+  // otherwise read it as active and refund twice.
+  const claimed = await db()
+    .update(credit)
+    .set({ status: CreditStatus.DELETED })
+    .where(
+      and(
+        eq(credit.id, consumeCreditId),
+        eq(credit.status, CreditStatus.ACTIVE)
+      )
+    )
+    .returning({ id: credit.id });
+  if (!claimed.length) return;
+
   await db().transaction(async (tx: any) => {
     // Atomic increment per source grant — no read-modify-write race.
     for (const item of items) {
@@ -245,12 +282,6 @@ export async function revoke(consumeCreditId: string) {
         })
         .where(eq(credit.id, item.creditId));
     }
-
-    // Mark consumption record as deleted
-    await tx
-      .update(credit)
-      .set({ status: CreditStatus.DELETED })
-      .where(eq(credit.id, consumeCreditId));
   });
 }
 

@@ -15,6 +15,13 @@ import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import {
+  HERO_DESKTOP_SIZES,
+  HERO_DESKTOP_WIDTHS,
+  HERO_MOBILE_MEDIA,
+  HERO_MOBILE_WIDTHS,
+  optSrcSet,
+} from '@/config/hotel-lobby-images';
+import {
   DEFAULT_DUET_LENGTH,
   DUET_LENGTHS,
   type DuetLength,
@@ -45,20 +52,6 @@ const friendsImage = '/imgs/generated/duet-friends.jpg';
 const siblingsImage = '/imgs/generated/duet-siblings.jpg';
 const coupleImage = '/imgs/generated/duet-couple.jpg';
 
-// Compressed AVIF/WebP renditions of the images above, generated into
-// public/imgs/generated/opt/<name>-<width>.<ext>. The originals stay as the
-// fallback for browsers without AVIF/WebP and for og:image.
-export function optSrcSet(name: string, widths: number[], ext: string) {
-  return widths
-    .map((w) => `/imgs/generated/opt/${name}-${w}.${ext} ${w}w`)
-    .join(', ');
-}
-export const HERO_DESKTOP_WIDTHS = [960, 1280, 1672];
-export const HERO_MOBILE_WIDTHS = [480, 768, 1024];
-export const HERO_MOBILE_MEDIA = '(max-width: 600px)';
-// The desktop hero is height-bound (≤720px tall at 1672:941), so it never
-// renders wider than ~1280 CSS px — don't let 100vw pick the 1672 file.
-export const HERO_DESKTOP_SIZES = 'min(100vw, 1280px)';
 const IDEA_SIZES = '(max-width: 600px) 100vw, (max-width: 1020px) 50vw, 420px';
 
 /** <picture> with AVIF → WebP → original fallback; lazy unless `eager`. */
@@ -530,10 +523,18 @@ export function HotelLobbyPage() {
     animate.isPending ||
     (!!taskId && task?.status !== 'success' && task?.status !== 'failed');
   const running = previewRunning || taskRunning;
+  // Why the free preview isn't offered: from a rejected attempt, or — for a
+  // signed-out visitor — straight from the quota, so the page says "today's
+  // free preview is used" instead of silently showing only "Sign in".
+  const freeReason =
+    makePreview.error?.message ??
+    (!user && !previewId && !taskId && quotaQuery.data?.left === 0
+      ? quotaQuery.data.reason
+      : null);
   const freeError =
-    makePreview.error?.message === FREE_PREVIEW_USED
+    freeReason === FREE_PREVIEW_USED
       ? m['hotel.create.free_used']()
-      : makePreview.error?.message === FREE_PREVIEW_PAUSED
+      : freeReason === FREE_PREVIEW_PAUSED
         ? m['hotel.create.free_paused']()
         : null;
   const paidError = (e: Error | null) =>

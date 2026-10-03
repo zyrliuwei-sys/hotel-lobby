@@ -1,16 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { envConfigs } from '@/config';
-import { m } from '@/paraglide/messages.js';
-import { getLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
 import {
   HERO_DESKTOP_SIZES,
   HERO_DESKTOP_WIDTHS,
   HERO_MOBILE_MEDIA,
   HERO_MOBILE_WIDTHS,
-  HotelLobbyPage,
   optSrcSet,
-} from '@/blocks/hotel-lobby';
+} from '@/config/hotel-lobby-images';
+import { m } from '@/paraglide/messages.js';
+import { getLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
+import { HotelLobbyPage } from '@/blocks/hotel-lobby';
 
 export const Route = createFileRoute('/')({
   loader: () => ({ locale: getLocale() }),

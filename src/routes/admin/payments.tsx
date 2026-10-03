@@ -334,15 +334,11 @@ function PaymentsPage() {
                     {(field) => (
                       <div className="space-y-1.5">
                         <Label>
-                          {m[
-                            `admin.payments.${
-                              name === 'productId'
-                                ? 'product_id_label'
-                                : name === 'productName'
-                                  ? 'product_name_label'
-                                  : 'product_description_label'
-                            }`
-                          ]()}
+                          {name === 'productId'
+                            ? m['admin.payments.product_id_label']()
+                            : name === 'productName'
+                              ? m['admin.payments.product_name_label']()
+                              : m['admin.payments.product_description_label']()}
                         </Label>
                         <Input
                           value={field.state.value}

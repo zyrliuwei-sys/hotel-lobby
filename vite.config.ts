@@ -8,6 +8,7 @@ import viteReact from '@vitejs/plugin-react';
 import { nitro } from 'nitro/vite';
 import { defineConfig } from 'vite';
 
+import { paraglideDirectImports } from './paraglide-direct-imports.mjs';
 import { paraglideConfig } from './paraglide.config.mjs';
 import { loadEnvFiles } from './src/lib/env';
 
@@ -62,7 +63,39 @@ export default defineConfig({
   // code is public anyway and carries no secrets (only VITE_* vars reach it);
   // the server bundle keeps no public maps.
   environments: {
-    client: { build: { sourcemap: true } },
+    client: {
+      build: {
+        sourcemap: true,
+        rolldownOptions: {
+          // Compiled Paraglide messages are pure functions: unused ones can
+          // be dropped along with the imports that only re-export them.
+          treeshake: {
+            moduleSideEffects: (id: string) =>
+              !/[\\/]paraglide[\\/]messages[\\/]/.test(id),
+            // Form schemas (`const schema = z.object(...)`) sit at the top of
+            // route files; the route splitter keeps top-level calls in the
+            // always-loaded route config. Building a zod schema has no side
+            // effects, so let unused ones (and zod) drop from the entry.
+            manualPureFunctions: ['z'],
+          },
+          output: {
+            codeSplitting: {
+              // Don't drag shared deps (the Paraglide runtime) into groups.
+              includeDependenciesRecursively: false,
+              groups: [
+                // admin.* / settings.* messages (~720 of ~1070) are only
+                // used behind sign-in; keep them out of the chunks the
+                // public homepage downloads.
+                {
+                  name: 'messages-app',
+                  test: /src[\\/]paraglide[\\/]messages[\\/](admin|settings)_/,
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
   },
   resolve: {
     tsconfigPaths: true,
@@ -78,6 +111,11 @@ export default defineConfig({
     { enforce: 'pre', ...mdx({ providerImportSource: '@mdx-js/react' }) },
     tailwindcss(),
     paraglideVitePlugin(paraglideConfig),
+    paraglideDirectImports({
+      messagesDir: fileURLToPath(
+        new URL('./src/paraglide/messages', import.meta.url)
+      ),
+    }),
     tanstackStart({
       srcDirectory: 'src',
     }),

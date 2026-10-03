@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import { lazy, Suspense, type ComponentType } from 'react';
 import { notFound, useLoaderData } from '@tanstack/react-router';
 
 import { envConfigs } from '@/config';
@@ -16,23 +16,33 @@ type PageMeta = {
   updated_at: string;
 };
 
-type PageModule = {
-  default: ComponentType;
-  meta: PageMeta;
-};
-
-// Eagerly bundle the static content pages (small legal/info MDX files).
-// Keys are absolute from the project root.
-const pages = import.meta.glob<PageModule>('/src/content/pages/*.mdx', {
+// Page metadata is bundled eagerly (loader/head need it synchronously); the
+// MDX bodies are split into their own chunks and loaded on demand, so the
+// legal text isn't part of every page's entry JS. Keys are absolute from the
+// project root.
+const metas = import.meta.glob<PageMeta>('/src/content/pages/*.mdx', {
   eager: true,
+  import: 'meta',
+});
+const bodies = import.meta.glob<ComponentType>('/src/content/pages/*.mdx', {
+  import: 'default',
 });
 
-function loadPage(slug: string, locale: string): PageModule | null {
-  return (
-    pages[`/src/content/pages/${slug}.${locale}.mdx`] ??
-    pages[`/src/content/pages/${slug}.${baseLocale}.mdx`] ??
-    null
-  );
+function pageKey(slug: string, locale: string): string | null {
+  const own = `/src/content/pages/${slug}.${locale}.mdx`;
+  if (metas[own]) return own;
+  const base = `/src/content/pages/${slug}.${baseLocale}.mdx`;
+  return metas[base] ? base : null;
+}
+
+const lazyBodies = new Map<string, ComponentType>();
+function pageBody(key: string): ComponentType {
+  let Body = lazyBodies.get(key);
+  if (!Body) {
+    Body = lazy(async () => ({ default: await bodies[key]() }));
+    lazyBodies.set(key, Body);
+  }
+  return Body;
 }
 
 type LoaderData = { meta: PageMeta; slug: string; locale: string };
@@ -45,9 +55,9 @@ export function staticPageRouteOptions(slug: string) {
   return {
     loader: (): LoaderData => {
       const locale = getLocale();
-      const page = loadPage(slug, locale);
-      if (!page) throw notFound();
-      return { meta: page.meta, slug, locale };
+      const key = pageKey(slug, locale);
+      if (!key) throw notFound();
+      return { meta: metas[key], slug, locale };
     },
     head: ({ loaderData }: { loaderData?: LoaderData }) => {
       if (!loaderData) return {};
@@ -80,8 +90,7 @@ function StaticPage() {
     strict: false,
   }) as LoaderData;
 
-  const page = loadPage(slug, locale)!;
-  const Content = page.default;
+  const Content = pageBody(pageKey(slug, locale)!);
 
   return (
     <article>
@@ -95,7 +104,9 @@ function StaticPage() {
         </p>
       </header>
       <div className="text-foreground/90 text-[15px] leading-7">
-        <Content />
+        <Suspense fallback={null}>
+          <Content />
+        </Suspense>
       </div>
     </article>
   );

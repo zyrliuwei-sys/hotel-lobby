@@ -709,6 +709,7 @@
   "admin.settings.fields.wechat_notify_url": "Notify URL (Webhook)",
   "admin.settings.fields.wechat_test_amount": "Test amount (cents)",
   "admin.settings.fields.email_provider": "Email Provider",
+  "admin.settings.fields.welcome_email_enabled": "Send welcome email on sign up",
   "admin.settings.fields.resend_api_key": "API Key",
   "admin.settings.fields.resend_sender_email": "Sender Email",
   "admin.settings.fields.cloudflare_email_api_token": "API Token",

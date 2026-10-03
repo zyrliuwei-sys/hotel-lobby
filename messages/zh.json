@@ -709,6 +709,7 @@
   "admin.settings.fields.wechat_notify_url": "回调地址（Webhook）",
   "admin.settings.fields.wechat_test_amount": "测试金额（分）",
   "admin.settings.fields.email_provider": "邮件服务商",
+  "admin.settings.fields.welcome_email_enabled": "注册成功后发送欢迎邮件",
   "admin.settings.fields.resend_api_key": "API 密钥",
   "admin.settings.fields.resend_sender_email": "发件地址",
   "admin.settings.fields.cloudflare_email_api_token": "API Token",

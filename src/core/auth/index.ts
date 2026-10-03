@@ -7,6 +7,7 @@ import type { EmailProvider } from '@/core/email';
 import { CloudflareEmailProvider } from '@/core/email/cloudflare';
 import { ResendProvider } from '@/core/email/resend';
 import { VerifyEmail } from '@/core/email/templates/verify-email';
+import { WelcomeEmail } from '@/core/email/templates/welcome-email';
 import { AUTH_SECRET_PLACEHOLDER, envConfigs } from '@/config';
 import * as schema from '@/config/db/schema';
 import { getAllConfigs } from '@/modules/config/service';
@@ -134,6 +135,63 @@ function getEmailProvider(
   const from = configs.resend_sender_email;
   if (!apiKey || !from) return null;
   return { provider: new ResendProvider({ apiKey, defaultFrom: from }), from };
+}
+
+/**
+ * Absolute raster logo URL for emails. Email clients don't render SVG <img>,
+ * so an SVG logo yields undefined and templates fall back to the text brand.
+ */
+function getEmailLogoUrl(
+  configs: Record<string, string>,
+  appUrl: string
+): string | undefined {
+  const rawLogo = configs.app_logo || '';
+  const logo = /\.svg(\?|#|$)/i.test(rawLogo) ? '' : rawLogo;
+  if (!logo) return undefined;
+  if (logo.startsWith('http')) return logo;
+  return `${configs.app_url || appUrl || ''}${logo.startsWith('/') ? '' : '/'}${logo}`;
+}
+
+/**
+ * Welcome email for every new account (email or social sign-up). On by
+ * default; admins can turn it off with `welcome_email_enabled`. Never throws —
+ * a failed send must not break sign-up.
+ */
+async function sendWelcomeEmail(
+  user: { email?: string; name?: string; locale?: string },
+  configs: Record<string, string>
+) {
+  try {
+    if (configs.welcome_email_enabled === 'false' || !user.email) return;
+    const emailCtx = getEmailProvider(configs);
+    if (!emailCtx) return;
+
+    const appName = configs.app_name || envConfigs.app_name;
+    const appUrl = configs.app_url || envConfigs.app_url;
+    const credits =
+      configs.initial_credits_enabled === 'true'
+        ? parseInt(configs.initial_credits_amount) || 0
+        : 0;
+    const zh = (user.locale || '').startsWith('zh');
+
+    const result = await emailCtx.provider.sendEmail({
+      to: user.email,
+      subject: zh ? `欢迎来到 ${appName}` : `Welcome to ${appName}`,
+      react: WelcomeEmail({
+        appName,
+        logoUrl: getEmailLogoUrl(configs, appUrl),
+        url: zh ? `${appUrl}/zh` : appUrl,
+        name: user.name || undefined,
+        credits,
+        locale: zh ? 'zh' : 'en',
+      }),
+    });
+    if (!result.success) {
+      console.error('[auth] welcome email failed:', result.error);
+    }
+  } catch (e) {
+    console.error('[auth] welcome email error:', e);
+  }
 }
 
 /** Check whether email sending is available for the selected provider */
@@ -298,6 +356,8 @@ export function getAuth(configs?: Record<string, string>) {
             } catch (error) {
               console.error('[auth] grant signup credits failed', error);
             }
+
+            await sendWelcomeEmail(createdUser, all);
           },
         },
       },
@@ -369,15 +429,7 @@ export function getAuth(configs?: Record<string, string>) {
                   return;
                 }
                 const appName = all.app_name || envConfigs.app_name;
-                // Email clients don't render SVG <img>; only embed a raster logo,
-                // otherwise fall back to the text brand in the template.
-                const rawLogo = all.app_logo || '';
-                const logo = /\.svg(\?|#|$)/i.test(rawLogo) ? '' : rawLogo;
-                const logoUrl = logo.startsWith('http')
-                  ? logo
-                  : logo
-                    ? `${all.app_url || appUrl || ''}${logo.startsWith('/') ? '' : '/'}${logo}`
-                    : undefined;
+                const logoUrl = getEmailLogoUrl(all, appUrl);
                 const result = await emailCtx.provider.sendEmail({
                   to: user.email,
                   subject: `Verify your email - ${appName}`,

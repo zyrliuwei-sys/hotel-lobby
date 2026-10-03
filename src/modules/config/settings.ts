@@ -751,6 +751,14 @@ export function getSettings(): Setting[] {
       tab: 'email',
       defaultValue: 'resend',
     },
+    {
+      name: 'welcome_email_enabled',
+      title: 'Send welcome email on sign up',
+      type: 'switch',
+      group: 'email_general',
+      tab: 'email',
+      defaultValue: 'true',
+    },
 
     // ─── Email / Resend ──────────────────────────────────────────────
     {

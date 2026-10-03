@@ -125,6 +125,7 @@ export function Pricing({
       featured?: boolean;
       badge?: string;
       highlight?: string;
+      plainFrame?: boolean;
       extra?: PricingFeature[];
       originalPrice?: string;
     }
@@ -146,6 +147,7 @@ export function Pricing({
       interval: interval ? m['landing.pricing.per_month']() : undefined,
       featured: opts.featured,
       badge: opts.badge,
+      plainFrame: opts.plainFrame,
       // Every plan that earns the first-order bonus says so.
       highlight:
         opts.highlight ??
@@ -219,6 +221,9 @@ export function Pricing({
           name: m['landing.pricing.pack_starter'](),
           description: m['landing.pricing.pack_desc'](),
           highlight: starterValue(),
+          // One-time packs keep the normal frame; the orange ring is for
+          // monthly plans with the first-order bonus.
+          plainFrame: true,
           extra: packExtra,
         }),
         plan('pack_standard', {

@@ -28,6 +28,8 @@ export interface PricingPlan {
   badge?: string;
   /** Eye-catching callout (e.g. a bonus) shown on an accent ring + banner. */
   highlight?: string;
+  /** Show the highlight banner but keep the card's normal frame. */
+  plainFrame?: boolean;
   features: PricingFeature[];
   buttonText?: string;
   productId?: string;
@@ -154,7 +156,7 @@ export function PricingTable({
             key={plan.id}
             className={cn(
               'border-border relative flex flex-col rounded-2xl border p-8 transition-all',
-              plan.highlight
+              plan.highlight && !plan.plainFrame
                 ? 'bg-card border-orange-500 shadow-lg ring-2 shadow-orange-500/20 ring-orange-500'
                 : plan.featured
                   ? 'bg-card ring-foreground/10 shadow-md ring-1'

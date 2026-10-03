@@ -1073,5 +1073,6 @@
   "hotel.create.length_credits": "credits",
   "landing.pricing.feature_videos_lengths": "≈ {short} × 8s or {long} × 15s duet videos",
   "landing.pricing.per_video_lengths": "8s duet video = {short} credits · 15s duet video = {long} credits",
-  "landing.pricing.feature_videos_short_only": "≈ {short} × 8s duet video (15s needs {credits} credits)"
+  "landing.pricing.feature_videos_short_only": "≈ {short} × 8s duet video (15s needs {credits} credits)",
+  "landing.pricing.starter_value": "{count} duet videos for {price} — about {each} each"
 }

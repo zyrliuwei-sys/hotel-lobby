@@ -81,6 +81,10 @@ export const Route = createRootRoute({
           type: 'font/woff2',
           href: dmSansLatinUrl,
           crossOrigin: 'anonymous',
+          // Desktop only: on slow mobile networks this 37 KB file competes
+          // with the CSS and hero image; body text falls back to the system
+          // sans (font-display: optional, so no layout shift either way).
+          media: '(min-width: 601px)',
         },
         { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
         { rel: 'apple-touch-icon', href: '/favicon.svg' },

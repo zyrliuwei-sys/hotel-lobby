@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight,
@@ -40,10 +40,18 @@ import { localizeHref } from '@/paraglide/runtime.js';
 import { useUserPermissions } from '@/hooks/use-user-permissions';
 import { Pricing } from '@/blocks/pricing';
 import { FooterBadgeList } from '@/components/footer-badge-list';
-import { SiteUserMenu } from '@/components/site-user-menu';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 import '@/styles/hotel-lobby.css';
+
+// Popups load on demand: the user menu only exists for signed-in visitors and
+// the paywall only after running out of credits — keep their dialog/menu code
+// out of the homepage's initial JS.
+const SiteUserMenu = lazy(() =>
+  import('@/components/site-user-menu').then((mod) => ({
+    default: mod.SiteUserMenu,
+  }))
+);
+const PaywallDialog = lazy(() => import('@/blocks/paywall-dialog'));
 
 const heroImage = '/imgs/generated/hotel-lobby-duet.png';
 const mobileHeroImage = '/imgs/generated/duet-hero-mobile.jpg';
@@ -301,6 +309,10 @@ export function HotelLobbyPage() {
   const canGenerate = consent && !!photoA && !!photoB;
   const queryClient = useQueryClient();
   const [paywall, setPaywall] = useState(false);
+  // Mount the (lazy) paywall dialog on first open and keep it mounted, so
+  // its close animation and later opens behave as before.
+  const [paywallMounted, setPaywallMounted] = useState(false);
+  if (paywall && !paywallMounted) setPaywallMounted(true);
 
   // Survive the sign-in / checkout round trip and reloads mid-generation:
   // the preview and task ids live in localStorage, photos aren't needed again.
@@ -606,11 +618,13 @@ export function HotelLobbyPage() {
         </nav>
         <div className="hl-header-actions">
           {user ? (
-            <SiteUserMenu
-              name={user.name || user.email}
-              email={user.email}
-              image={user.image}
-            />
+            <Suspense fallback={<span className="block size-9" />}>
+              <SiteUserMenu
+                name={user.name || user.email}
+                email={user.email}
+                image={user.image}
+              />
+            </Suspense>
           ) : (
             <Link className="hl-nav-cta" href="/sign-in">
               {m['common.sign.sign_in_title']()} <ArrowRight size={16} />
@@ -1086,11 +1100,11 @@ export function HotelLobbyPage() {
 
         <Pricing />
 
-        <Dialog open={paywall} onOpenChange={setPaywall}>
-          <DialogContent className="max-h-[90vh] overflow-y-auto p-6 sm:max-w-5xl">
-            <Pricing variant="dialog" title={m['hotel.paywall.title']()} />
-          </DialogContent>
-        </Dialog>
+        {paywallMounted && (
+          <Suspense fallback={null}>
+            <PaywallDialog open={paywall} onOpenChange={setPaywall} />
+          </Suspense>
+        )}
 
         <section id="faq" className="hl-faq" aria-labelledby="faq-heading">
           <div className="hl-section-intro">

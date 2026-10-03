@@ -51,6 +51,10 @@ const workersDb = isCloudflareBuild ? workersDbProvider() : '';
 const keepPostgres = workersDb === 'postgresql' || workersDb === 'postgres';
 
 export default defineConfig({
+  define: {
+    // Versions the homepage HTML edge cache (src/server.ts) per build.
+    __BUILD_ID__: JSON.stringify(Date.now().toString(36)),
+  },
   server: {
     port: 3000,
     host: '0.0.0.0',

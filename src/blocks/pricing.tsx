@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   CalendarClock,
@@ -21,16 +21,19 @@ import { currentPathWithQuery } from '@/lib/redirect';
 import { track } from '@/lib/track';
 import { m } from '@/paraglide/messages.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
-import {
-  PaymentProviderModal,
-  type PaymentProvider,
-} from '@/components/payment-provider-modal';
+import type { PaymentProvider } from '@/components/payment-provider-modal';
 import {
   PricingTable,
   type PricingFeature,
   type PricingGroup,
   type PricingPlan,
 } from '@/components/pricing-table';
+
+const PaymentProviderModal = lazy(() =>
+  import('@/components/payment-provider-modal').then((mod) => ({
+    default: mod.PaymentProviderModal,
+  }))
+);
 
 function usd(cents: number) {
   return `$${(cents / 100).toLocaleString('en-US', {
@@ -62,6 +65,9 @@ export function Pricing({
   const { data: configsData, refetch: refetchConfigs } = usePublicConfig();
   const configs = configsData ?? {};
   const [modalOpen, setModalOpen] = useState(false);
+  // The provider picker (a dialog) loads on first open and stays mounted.
+  const [modalMounted, setModalMounted] = useState(false);
+  if (modalOpen && !modalMounted) setModalMounted(true);
   const [pendingPlan, setPendingPlan] = useState<PricingPlan | null>(null);
   const [loadingProvider, setLoadingProvider] =
     useState<PaymentProvider | null>(null);
@@ -156,6 +162,18 @@ export function Pricing({
     return card;
   }
 
+  // "N videos for $X — about $Y each" on the starter card.
+  function starterValue() {
+    const product = pricingCatalog.pack_starter;
+    const count = Math.floor(product.credits / perVideo);
+    if (count < 2) return undefined;
+    return m['landing.pricing.starter_value']({
+      count,
+      price: usd(product.priceInCents),
+      each: usd(Math.round(product.priceInCents / count)),
+    });
+  }
+
   const packExtra = [
     {
       icon: InfinityIcon,
@@ -201,6 +219,7 @@ export function Pricing({
         plan('pack_starter', {
           name: m['landing.pricing.pack_starter'](),
           description: m['landing.pricing.pack_desc'](),
+          highlight: starterValue(),
           extra: packExtra,
         }),
         plan('pack_standard', {
@@ -334,21 +353,25 @@ export function Pricing({
         />
       </div>
 
-      <PaymentProviderModal
-        open={modalOpen}
-        onOpenChange={(open) => {
-          setModalOpen(open);
-          if (!open) {
-            setPendingPlan(null);
-            setLoadingProvider(null);
-          }
-        }}
-        providers={enabledProviders.length ? enabledProviders : ['stripe']}
-        loadingProvider={loadingProvider}
-        onSelect={handleProviderSelect}
-        planName={pendingPlan?.name}
-        price={pendingPlan?.price}
-      />
+      {modalMounted && (
+        <Suspense fallback={null}>
+          <PaymentProviderModal
+            open={modalOpen}
+            onOpenChange={(open) => {
+              setModalOpen(open);
+              if (!open) {
+                setPendingPlan(null);
+                setLoadingProvider(null);
+              }
+            }}
+            providers={enabledProviders.length ? enabledProviders : ['stripe']}
+            loadingProvider={loadingProvider}
+            onSelect={handleProviderSelect}
+            planName={pendingPlan?.name}
+            price={pendingPlan?.price}
+          />
+        </Suspense>
+      )}
     </Wrapper>
   );
 }

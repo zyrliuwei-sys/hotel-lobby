@@ -63,9 +63,11 @@ export const pricingCatalog: Record<string, PricingProduct> = {
     planName: 'Starter Pack',
     description: 'Starter Pack',
     type: PaymentType.ONE_TIME,
-    priceInCents: 500,
+    // $9.90 for two 8 s videos (≈ 7× fal cost after PayPal fees); was
+    // $5 / 440 until 2026-10-03 — compare paid starter orders per day.
+    priceInCents: 990,
     currency: 'usd',
-    credits: 440,
+    credits: 880,
   },
   pack_standard: {
     productId: 'pack_standard',

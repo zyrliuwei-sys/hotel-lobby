@@ -24,12 +24,55 @@ function ensureCloudflareEnv(): Promise<void> {
   return cfEnvPromise;
 }
 
+// Edge cache for the homepage HTML (Cloudflare Workers Cache API). The
+// rendered homepage is identical for every visitor (session, credits and the
+// user menu load client-side), so a 5-minute shared copy cuts TTFB without
+// changing what anyone sees. Keyed by build id so a deploy never serves HTML
+// that points at the previous build's assets. Query strings (utm_*, …) and
+// other paths always render fresh; admin settings show up within 5 minutes.
+declare const __BUILD_ID__: string;
+const HTML_CACHE_PATHS = new Set(['/', '/zh', '/zh/']);
+const HTML_CACHE_SECONDS = 300;
+
+function htmlEdgeCache(req: Request): Cache | undefined {
+  if (req.method !== 'GET') return undefined;
+  const url = new URL(req.url);
+  if (url.search || !HTML_CACHE_PATHS.has(url.pathname)) return undefined;
+  return (globalThis as { caches?: { default?: Cache } }).caches?.default;
+}
+
+async function renderWithEdgeCache(req: Request): Promise<Response> {
+  const render = () => paraglideMiddleware(req, () => handler.fetch(req));
+  const cache = htmlEdgeCache(req);
+  if (!cache) return render();
+
+  const url = new URL(req.url);
+  const key = new Request(`${url.origin}${url.pathname}?__v=${__BUILD_ID__}`);
+  const hit = await cache.match(key);
+  if (hit) {
+    const response = new Response(hit.body, hit);
+    response.headers.set('Cache-Control', 'no-cache');
+    response.headers.set('X-HTML-Cache', 'HIT');
+    return response;
+  }
+
+  const fresh = await render();
+  if (fresh.status !== 200 || fresh.headers.has('Set-Cookie')) return fresh;
+  const body = await fresh.arrayBuffer();
+  const stored = new Response(body, fresh);
+  stored.headers.set('Cache-Control', `public, max-age=${HTML_CACHE_SECONDS}`);
+  await cache.put(key, stored).catch(() => {});
+  const response = new Response(body, fresh);
+  response.headers.set('X-HTML-Cache', 'MISS');
+  return response;
+}
+
 // Custom server entry — wraps every request in Paraglide's middleware so
 // getLocale() resolves per-request (AsyncLocalStorage) during SSR.
 export default {
   async fetch(req: Request): Promise<Response> {
     await ensureCloudflareEnv();
-    const response = await paraglideMiddleware(req, () => handler.fetch(req));
+    const response = await renderWithEdgeCache(req);
     response.headers.set('X-Content-Type-Options', 'nosniff');
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     response.headers.set(

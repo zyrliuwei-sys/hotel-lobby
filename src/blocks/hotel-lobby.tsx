@@ -15,8 +15,14 @@ import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import {
+  DEFAULT_DUET_LENGTH,
+  DUET_LENGTHS,
+  type DuetLength,
+} from '@/config/hotel-lobby-pricing';
+import {
   DEFAULT_DUET_SIZE,
   DUET_SIZES,
+  OFFERED_DUET_SIZES,
   type DuetSize,
 } from '@/config/hotel-lobby-sizes';
 import { apiGet, apiPost } from '@/lib/api-client';
@@ -37,6 +43,62 @@ const previewImage = '/imgs/generated/duet-scene-preview.jpg';
 const friendsImage = '/imgs/generated/duet-friends.jpg';
 const siblingsImage = '/imgs/generated/duet-siblings.jpg';
 const coupleImage = '/imgs/generated/duet-couple.jpg';
+
+// Compressed AVIF/WebP renditions of the images above, generated into
+// public/imgs/generated/opt/<name>-<width>.<ext>. The originals stay as the
+// fallback for browsers without AVIF/WebP and for og:image.
+export function optSrcSet(name: string, widths: number[], ext: string) {
+  return widths
+    .map((w) => `/imgs/generated/opt/${name}-${w}.${ext} ${w}w`)
+    .join(', ');
+}
+export const HERO_DESKTOP_WIDTHS = [960, 1280, 1672];
+export const HERO_MOBILE_WIDTHS = [480, 768, 1024];
+export const HERO_MOBILE_MEDIA = '(max-width: 600px)';
+// The desktop hero is height-bound (≤720px tall at 1672:941), so it never
+// renders wider than ~1280 CSS px — don't let 100vw pick the 1672 file.
+export const HERO_DESKTOP_SIZES = 'min(100vw, 1280px)';
+const IDEA_SIZES = '(max-width: 600px) 100vw, (max-width: 1020px) 50vw, 420px';
+
+/** <picture> with AVIF → WebP → original fallback; lazy unless `eager`. */
+function OptImage({
+  name,
+  widths,
+  sizes,
+  src,
+  eager,
+  ...img
+}: {
+  name: string;
+  widths: number[];
+  sizes: string;
+  src: string;
+  eager?: boolean;
+  alt: string;
+  width: number;
+  height: number;
+}) {
+  return (
+    <picture>
+      <source
+        type="image/avif"
+        srcSet={optSrcSet(name, widths, 'avif')}
+        sizes={sizes}
+      />
+      <source
+        type="image/webp"
+        srcSet={optSrcSet(name, widths, 'webp')}
+        sizes={sizes}
+      />
+      <img
+        src={src}
+        loading={eager ? undefined : 'lazy'}
+        decoding="async"
+        {...img}
+      />
+    </picture>
+  );
+}
 
 // Finished duet clips shown under the hero (muted autoplay loops). Drop MP4s
 // into public/videos/examples/ and list them here; the strip hides when empty.
@@ -218,6 +280,7 @@ export function HotelLobbyPage() {
   const [photoB, setPhotoB] = useState<File | null>(null);
   const [direction, setDirection] = useState('');
   const [size, setSize] = useState<DuetSize>(DEFAULT_DUET_SIZE);
+  const [length, setLength] = useState<DuetLength>(DEFAULT_DUET_LENGTH);
   const [previewId, setPreviewId] = useState<string>();
   const [taskId, setTaskId] = useState<string>();
   const [consent, setConsent] = useState(false);
@@ -317,7 +380,7 @@ export function HotelLobbyPage() {
 
   const animate = useMutation({
     mutationFn: () =>
-      apiPost<DuetTask>('/api/hotel-lobby/animate', { previewId }),
+      apiPost<DuetTask>('/api/hotel-lobby/animate', { previewId, length }),
     onSuccess: onTaskStarted,
     onError: onPaidError,
   });
@@ -329,6 +392,7 @@ export function HotelLobbyPage() {
         photoB: await toDataUrl(photoB!),
         direction: direction.trim() || undefined,
         size,
+        length,
       }),
     onSuccess: (task) => {
       setPreviewId(undefined);
@@ -353,7 +417,10 @@ export function HotelLobbyPage() {
   }, [task?.status]);
   const priceQuery = useQuery({
     queryKey: ['hotel-lobby-price'],
-    queryFn: () => apiGet<{ credits: number }>('/api/hotel-lobby/price'),
+    queryFn: () =>
+      apiGet<{ credits: number; lengths?: Record<DuetLength, number> }>(
+        '/api/hotel-lobby/price'
+      ),
     staleTime: 10 * 60_000,
   });
   const creditsQuery = useQuery({
@@ -362,7 +429,10 @@ export function HotelLobbyPage() {
     enabled: !!user,
   });
   const { data: permissions } = useUserPermissions(!!user);
-  const price = priceQuery.data?.credits;
+  // Price of the selected length (older API responses only had `credits`).
+  const price =
+    priceQuery.data?.lengths?.[length] ??
+    (length === DEFAULT_DUET_LENGTH ? priceQuery.data?.credits : undefined);
   const openPaywall = () => {
     track('hl_paywall_open');
     setPaywall(true);
@@ -492,8 +562,31 @@ export function HotelLobbyPage() {
       <main>
         <section className="hl-hero">
           <div className="hl-hero-frame">
+            {/* Preloaded in routes/index.tsx — keep the srcsets in sync. */}
             <picture>
-              <source media="(max-width: 600px)" srcSet={mobileHeroImage} />
+              <source
+                media={HERO_MOBILE_MEDIA}
+                type="image/avif"
+                srcSet={optSrcSet('hero-mobile', HERO_MOBILE_WIDTHS, 'avif')}
+                sizes="100vw"
+              />
+              <source
+                media={HERO_MOBILE_MEDIA}
+                type="image/webp"
+                srcSet={optSrcSet('hero-mobile', HERO_MOBILE_WIDTHS, 'webp')}
+                sizes="100vw"
+              />
+              <source media={HERO_MOBILE_MEDIA} srcSet={mobileHeroImage} />
+              <source
+                type="image/avif"
+                srcSet={optSrcSet('hero-desktop', HERO_DESKTOP_WIDTHS, 'avif')}
+                sizes={HERO_DESKTOP_SIZES}
+              />
+              <source
+                type="image/webp"
+                srcSet={optSrcSet('hero-desktop', HERO_DESKTOP_WIDTHS, 'webp')}
+                sizes={HERO_DESKTOP_SIZES}
+              />
               <img
                 src={heroImage}
                 alt={m['hotel.hero.image_alt']()}
@@ -582,7 +675,7 @@ export function HotelLobbyPage() {
                 role="radiogroup"
                 aria-labelledby="duet-size-label"
               >
-                {(Object.keys(DUET_SIZES) as DuetSize[]).map((key) => (
+                {OFFERED_DUET_SIZES.map((key) => (
                   <button
                     key={key}
                     type="button"
@@ -598,7 +691,41 @@ export function HotelLobbyPage() {
                         aspectRatio: `${DUET_SIZES[key].width} / ${DUET_SIZES[key].height}`,
                       }}
                     />
-                    <span>{key}</span>
+                    <span>
+                      {key === 'full'
+                        ? m['hotel.create.shot_full']()
+                        : m['hotel.create.shot_classic']()}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <p className="hl-field-label" id="duet-length-label">
+                {m['hotel.create.length']()}
+              </p>
+              <div
+                className="hl-sizes"
+                role="radiogroup"
+                aria-labelledby="duet-length-label"
+              >
+                {(Object.keys(DUET_LENGTHS) as DuetLength[]).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="radio"
+                    aria-checked={length === key}
+                    className="hl-size"
+                    disabled={running}
+                    onClick={() => setLength(key)}
+                  >
+                    <span className="hl-length-seconds">
+                      {m['hotel.create.length_seconds']({ seconds: key })}
+                    </span>
+                    <span>
+                      {priceQuery.data?.lengths?.[key]?.toLocaleString(
+                        'en-US'
+                      ) ?? '…'}{' '}
+                      {m['hotel.create.length_credits']()}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -752,7 +879,10 @@ export function HotelLobbyPage() {
                     onError={forget}
                   />
                 ) : (
-                  <img
+                  <OptImage
+                    name="scene-preview"
+                    widths={[480, 768]}
+                    sizes="(max-width: 600px) 100vw, 480px"
                     src={previewImage}
                     alt={m['hotel.hero.image_alt']()}
                     width={1024}
@@ -799,12 +929,14 @@ export function HotelLobbyPage() {
           <div className="hl-ideas-grid">
             <article>
               <div className="hl-idea-media">
-                <img
+                <OptImage
+                  name="friends"
+                  widths={[640, 960]}
+                  sizes={IDEA_SIZES}
                   src={friendsImage}
                   alt={m['hotel.ideas.image_alt']()}
                   width={1536}
                   height={1024}
-                  loading="lazy"
                 />
               </div>
               <h3>{m['hotel.ideas.friends.title']()}</h3>
@@ -812,12 +944,14 @@ export function HotelLobbyPage() {
             </article>
             <article>
               <div className="hl-idea-media">
-                <img
+                <OptImage
+                  name="siblings"
+                  widths={[640, 960]}
+                  sizes={IDEA_SIZES}
                   src={siblingsImage}
                   alt={m['hotel.ideas.siblings.image_alt']()}
                   width={1536}
                   height={1024}
-                  loading="lazy"
                 />
               </div>
               <h3>{m['hotel.ideas.siblings.title']()}</h3>
@@ -825,12 +959,14 @@ export function HotelLobbyPage() {
             </article>
             <article>
               <div className="hl-idea-media">
-                <img
+                <OptImage
+                  name="couple"
+                  widths={[640, 960]}
+                  sizes={IDEA_SIZES}
                   src={coupleImage}
                   alt={m['hotel.ideas.couples.image_alt']()}
                   width={1536}
                   height={1024}
-                  loading="lazy"
                 />
               </div>
               <h3>{m['hotel.ideas.couples.title']()}</h3>
@@ -893,21 +1029,21 @@ export function HotelLobbyPage() {
             <h2 id="faq-heading">{m['hotel.faq.title']()}</h2>
           </div>
           <div className="hl-faq-list">
-            {(
-              [
-                'one',
-                'two',
-                'three',
-                'four',
-                'five',
-                'six',
-                'seven',
-                'eight',
-              ] as const
-            ).map((item) => (
+            {/* Static message refs: a template-literal key (m[`…${x}`])
+                pulls every message of both locales into the client bundle. */}
+            {[
+              [m['hotel.faq.one.question'], m['hotel.faq.one.answer']],
+              [m['hotel.faq.two.question'], m['hotel.faq.two.answer']],
+              [m['hotel.faq.three.question'], m['hotel.faq.three.answer']],
+              [m['hotel.faq.four.question'], m['hotel.faq.four.answer']],
+              [m['hotel.faq.five.question'], m['hotel.faq.five.answer']],
+              [m['hotel.faq.six.question'], m['hotel.faq.six.answer']],
+              [m['hotel.faq.seven.question'], m['hotel.faq.seven.answer']],
+              [m['hotel.faq.eight.question'], m['hotel.faq.eight.answer']],
+            ].map(([question, answer], item) => (
               <details key={item}>
-                <summary>{m[`hotel.faq.${item}.question`]()}</summary>
-                <p>{m[`hotel.faq.${item}.answer`]()}</p>
+                <summary>{question()}</summary>
+                <p>{answer()}</p>
               </details>
             ))}
           </div>
@@ -939,6 +1075,7 @@ export function HotelLobbyPage() {
           <a href="mailto:support@hotel-lobby.org">support@hotel-lobby.org</a>
           <Link href="/privacy-policy">{m['landing.footer.privacy']()}</Link>
           <Link href="/terms-of-service">{m['landing.footer.terms']()}</Link>
+          <Link href="/acceptable-use-policy">{m['landing.footer.aup']()}</Link>
         </div>
         <FooterBadgeList className="basis-full" />
       </footer>

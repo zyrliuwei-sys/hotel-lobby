@@ -9,7 +9,8 @@ export const DEVICE_COOKIE = 'hl_did';
 export const FREE_PREVIEW_USED = 'FREE_PREVIEW_USED';
 export const FREE_PREVIEW_PAUSED = 'FREE_PREVIEW_PAUSED';
 
-const DEFAULT_DAILY_CAP = 200;
+// ~$0.02 each and ~8 previews per paying user — cap the daily giveaway.
+const DEFAULT_DAILY_CAP = 50;
 const DEFAULT_PER_VISITOR = 1;
 
 function readNumber(value: string | undefined, fallback: number) {

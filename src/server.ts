@@ -36,6 +36,21 @@ export default {
       'Permissions-Policy',
       'camera=(), microphone=(), geolocation=()'
     );
+    // Hardening that can't break third-party scripts: HTTPS-only for a year
+    // (no includeSubDomains/preload — mail records live on subdomains), no
+    // framing by other sites, popups (Google sign-in, PayPal) still allowed.
+    // A script-src allowlist / Trusted Types is deliberately left out: GA,
+    // Clarity, PayPal and SSR inline scripts would need a nonce rollout first.
+    response.headers.set('Strict-Transport-Security', 'max-age=31536000');
+    response.headers.set('X-Frame-Options', 'SAMEORIGIN');
+    response.headers.set(
+      'Cross-Origin-Opener-Policy',
+      'same-origin-allow-popups'
+    );
+    response.headers.set(
+      'Content-Security-Policy',
+      "frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
+    );
     const utmSource = new URL(req.url).searchParams.get('utm_source');
     const existing = getCookieFromHeader(
       req.headers.get('cookie'),

@@ -44,3 +44,31 @@ export function resolveDuetCredits(configs: Record<string, string>) {
       : DEFAULT_REFERENCE_SECONDS
   );
 }
+
+/**
+ * Video lengths offered in the generator. Each maps to its own reference
+ * performance (8 s: the original clip; 15 s: a two-person verse from the
+ * COLORS session) and is priced at 7× its own fal cost.
+ */
+export const DUET_LENGTHS = { '8': 8, '15': 15 } as const;
+export type DuetLength = keyof typeof DUET_LENGTHS;
+export const DEFAULT_DUET_LENGTH: DuetLength = '8';
+
+export function isDuetLength(value: unknown): value is DuetLength {
+  return typeof value === 'string' && value in DUET_LENGTHS;
+}
+
+/**
+ * Credits for one video of the given length. 8 s keeps the existing admin
+ * settings (hotel_lobby_credits / hotel_lobby_video_seconds); 15 s can be
+ * overridden with hotel_lobby_credits_15.
+ */
+export function resolveDuetCreditsFor(
+  configs: Record<string, string>,
+  length: DuetLength
+) {
+  if (length === '8') return resolveDuetCredits(configs);
+  const override = Number(configs.hotel_lobby_credits_15);
+  if (Number.isFinite(override) && override > 0) return Math.ceil(override);
+  return duetCredits(DUET_LENGTHS[length]);
+}

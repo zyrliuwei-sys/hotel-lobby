@@ -200,6 +200,12 @@ export function getSettingGroups(): SettingGroup[] {
       tab: 'analytics',
     },
     {
+      name: 'clarity',
+      title: 'Microsoft Clarity',
+      description: 'Inject the Clarity tag (heatmaps and session recordings)',
+      tab: 'analytics',
+    },
+    {
       name: 'plausible',
       title: 'Plausible',
       description: 'Inject plausible.js for self-hosted or cloud Plausible',
@@ -915,10 +921,36 @@ export function getSettings(): Setting[] {
 
     // ─── AI / Hotel Lobby duet ───────────────────────────────────────
     {
+      name: 'prompt_screening_enabled',
+      title: 'Prompt screening (Waffo)',
+      type: 'switch',
+      tip: 'Scan styling notes with the Waffo content-safety API before generation. Uses the Waffo Merchant ID and private key from the Payment tab; skipped while those are empty.',
+      group: 'hotel_lobby',
+      tab: 'ai',
+      defaultValue: 'true',
+    },
+    {
       name: 'hotel_lobby_motion_video_url',
       title: 'Reference video URL',
       type: 'text',
       placeholder: 'https://…/hotel-lobby-reference.mp4 (MP4, ≤30s, 9:16)',
+      group: 'hotel_lobby',
+      tab: 'ai',
+    },
+    {
+      name: 'hotel_lobby_motion_video_url_15',
+      title: '15-second reference video URL',
+      type: 'text',
+      placeholder:
+        'Leave empty = /videos/hotel-lobby-verse15.mp4 (the COLORS verse shipped with the site)',
+      group: 'hotel_lobby',
+      tab: 'ai',
+    },
+    {
+      name: 'hotel_lobby_credits_15',
+      title: 'Credits per 15-second video (override)',
+      type: 'number',
+      placeholder: 'Leave empty = auto (680: 7× fal cost, 1 credit = $0.01)',
       group: 'hotel_lobby',
       tab: 'ai',
     },
@@ -943,7 +975,7 @@ export function getSettings(): Setting[] {
       name: 'hotel_lobby_free_preview_cap',
       title: 'Free previews per day (site-wide)',
       type: 'number',
-      placeholder: '200 (default; 0 = turn free previews off)',
+      placeholder: '50 (default; 0 = turn free previews off)',
       group: 'hotel_lobby',
       tab: 'ai',
     },
@@ -994,6 +1026,17 @@ export function getSettings(): Setting[] {
       type: 'text',
       placeholder: 'G-XXXXXXXXXX',
       group: 'google_analytics',
+      tab: 'analytics',
+    },
+
+    // ─── Analytics / Microsoft Clarity ───────────────────────────────
+    {
+      name: 'clarity_project_id',
+      title: 'Project ID',
+      type: 'text',
+      placeholder: 'abcd1234ef',
+      tip: 'Clarity → Settings → Overview → Project ID',
+      group: 'clarity',
       tab: 'analytics',
     },
 

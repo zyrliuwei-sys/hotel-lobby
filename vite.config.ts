@@ -58,6 +58,12 @@ export default defineConfig({
     // preview with "Blocked request. This host is not allowed."
     allowedHosts: ['.e2b.app'],
   },
+  // Source maps for browser JS only (Lighthouse "valid source maps"). Client
+  // code is public anyway and carries no secrets (only VITE_* vars reach it);
+  // the server bundle keeps no public maps.
+  environments: {
+    client: { build: { sourcemap: true } },
+  },
   resolve: {
     tsconfigPaths: true,
     alias: isCloudflareBuild

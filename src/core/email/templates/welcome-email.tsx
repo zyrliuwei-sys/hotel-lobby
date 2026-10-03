@@ -30,7 +30,7 @@ const copy = {
     credits: (n: number) =>
       `We've added ${n.toLocaleString('en-US')} free credits to your account to get you started.`,
     bonus:
-      'First order bonus: your first credit pack comes with 1 extra video free.',
+      'First order bonus: subscribe to any monthly plan and get 1 free 8-second video.',
     refund: 'If a generation fails, your credits are refunded automatically.',
     cta: 'Make your first duet',
     videos: 'Your finished videos are always saved in My videos.',
@@ -51,7 +51,7 @@ const copy = {
     ],
     credits: (n: number) =>
       `我们已向你的账号赠送 ${n.toLocaleString('en-US')} 积分，可以直接开始。`,
-    bonus: '首单福利：第一次购买积分包，加送 1 个视频。',
+    bonus: '首单福利：首次订阅任意月付套餐，加送 1 个 8 秒视频。',
     refund: '生成失败会自动退还积分。',
     cta: '做第一个对唱视频',
     videos: '生成好的视频都会保存在「我的视频」里。',

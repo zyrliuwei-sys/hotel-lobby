@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, isNull, like } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import {
@@ -20,6 +20,7 @@ import {
 } from '@/core/payment/types';
 import { credit, order, subscription } from '@/config/db/schema';
 import { resolveDuetCredits } from '@/config/hotel-lobby-pricing';
+import { qualifiesForFirstOrderBonus } from '@/config/pricing';
 import { getAllConfigs } from '@/modules/config/service';
 import { calculateCreditExpirationTime } from '@/modules/credits/service';
 import {
@@ -31,6 +32,8 @@ import {
   type UpdateSubscription,
 } from '@/modules/subscriptions/service';
 import { getSnowId, getUniSeq, getUuid } from '@/lib/hash';
+
+const FIRST_ORDER_BONUS_DESCRIPTION = 'First purchase bonus: 1 free video';
 
 // --- Order types ---
 
@@ -446,19 +449,28 @@ async function handleCheckoutSuccess(session: any, provider: string) {
         });
       }
 
-      // 3. First paid order: bonus credits worth one extra duet video
-      const [previousPaid] = await tx
-        .select({ id: order.id })
-        .from(order)
-        .where(
-          and(
-            eq(order.userId, existingOrder.userId),
-            eq(order.status, OrderStatus.PAID),
-            ne(order.id, existingOrder.id)
-          )
-        )
-        .limit(1);
-      if (!previousPaid) {
+      // 3. First monthly subscription of $23+: bonus credits worth one
+      // 8-second duet video (never the 15 s price), once per user (one-time
+      // packs don't use it up).
+      const bonusEligible =
+        qualifiesForFirstOrderBonus({
+          type: existingOrder.paymentType,
+          priceInCents: existingOrder.amount || 0,
+        }) &&
+        !(
+          await tx
+            .select({ id: credit.id })
+            .from(credit)
+            .where(
+              and(
+                eq(credit.userId, existingOrder.userId),
+                eq(credit.transactionScene, 'reward'),
+                like(credit.description, `${FIRST_ORDER_BONUS_DESCRIPTION}%`)
+              )
+            )
+            .limit(1)
+        ).length;
+      if (bonusEligible) {
         const bonus = resolveDuetCredits(await getAllConfigs());
         await tx.insert(credit).values({
           id: getUuid(),
@@ -471,7 +483,7 @@ async function handleCheckoutSuccess(session: any, provider: string) {
           transactionScene: 'reward',
           credits: bonus,
           remainingCredits: bonus,
-          description: 'First purchase bonus: 1 free video',
+          description: FIRST_ORDER_BONUS_DESCRIPTION,
           expiresAt: calculateCreditExpirationTime({
             creditsValidDays: existingOrder.creditsValidDays || 0,
             currentPeriodEnd: subscriptionInfo?.currentPeriodEnd,

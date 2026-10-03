@@ -19,6 +19,11 @@ const STATIC_PAGES: { path: string; title: string; description: string }[] = [
     title: 'Terms of Service',
     description: 'Terms of use',
   },
+  {
+    path: '/acceptable-use-policy',
+    title: 'Acceptable Use Policy',
+    description: 'Content rules, child safety and how to report violations',
+  },
 ];
 
 export const Route = createFileRoute('/llms.txt')({

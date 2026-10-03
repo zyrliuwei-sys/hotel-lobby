@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { getAuthClient, useSession } from '@/core/auth/client';
 import { currentPathWithQuery } from '@/lib/redirect';
@@ -10,12 +10,31 @@ import { usePublicConfig } from '@/hooks/use-public-config';
 // admin has enabled it. Self-contained: pulls config from
 // /api/config/public, gates on session, and triggers at most once
 // per page load.
+//
+// Waits for the visitor's first interaction: prompting on load makes Chrome
+// log "Not signed in with the identity provider" (FedCM) for every visitor
+// without a Google session, which Lighthouse counts as a console error.
 export function GoogleOneTap() {
   const { data: session, isPending } = useSession();
   const { data: configs } = usePublicConfig();
   const triggered = useRef(false);
+  const [interacted, setInteracted] = useState(false);
 
   useEffect(() => {
+    const events = ['pointerdown', 'keydown', 'scroll', 'touchstart'];
+    const onInteract = () => {
+      setInteracted(true);
+      events.forEach((e) => window.removeEventListener(e, onInteract));
+    };
+    events.forEach((e) =>
+      window.addEventListener(e, onInteract, { passive: true, once: true })
+    );
+    return () =>
+      events.forEach((e) => window.removeEventListener(e, onInteract));
+  }, []);
+
+  useEffect(() => {
+    if (!interacted) return;
     if (triggered.current) return;
     if (!configs) return;
     if (isPending) return;
@@ -42,7 +61,7 @@ export function GoogleOneTap() {
         // Same — One Tap cancellations throw NetworkError/AbortError that
         // aren't actionable.
       });
-  }, [configs, session, isPending]);
+  }, [interacted, configs, session, isPending]);
 
   return null;
 }

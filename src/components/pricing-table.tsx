@@ -128,7 +128,7 @@ export function PricingTable({
               >
                 {group.label}
                 {group.badge && (
-                  <span className="ml-1.5 rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  <span className="ml-1.5 rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-semibold text-orange-950">
                     {group.badge}
                   </span>
                 )}
@@ -166,7 +166,7 @@ export function PricingTable({
                 className={cn(
                   'absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap',
                   plan.highlight
-                    ? 'bg-orange-500 text-white'
+                    ? 'bg-orange-500 text-orange-950'
                     : 'bg-foreground text-background'
                 )}
               >

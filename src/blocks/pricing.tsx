@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { useSession } from '@/core/auth/client';
 import { useRouter } from '@/core/i18n/navigation';
 import { duetCredits } from '@/config/hotel-lobby-pricing';
-import { pricingCatalog } from '@/config/pricing';
+import { pricingCatalog, qualifiesForFirstOrderBonus } from '@/config/pricing';
 import { apiGet, apiPost } from '@/lib/api-client';
 import { currentPathWithQuery } from '@/lib/redirect';
 import { track } from '@/lib/track';
@@ -74,10 +74,14 @@ export function Pricing({
   // Live per-video price so "≈ N videos" matches what generation charges.
   const { data: priceData } = useQuery({
     queryKey: ['hotel-lobby-price'],
-    queryFn: () => apiGet<{ credits: number }>('/api/hotel-lobby/price'),
+    queryFn: () =>
+      apiGet<{ credits: number; lengths?: Record<string, number> }>(
+        '/api/hotel-lobby/price'
+      ),
     staleTime: 10 * 60_000,
   });
   const perVideo = priceData?.credits ?? duetCredits();
+  const perLongVideo = priceData?.lengths?.['15'] ?? duetCredits(15);
 
   function features(credits: number, extra: PricingFeature[]) {
     return [
@@ -89,9 +93,16 @@ export function Pricing({
       },
       {
         icon: Film,
-        label: m['landing.pricing.feature_videos']({
-          count: Math.floor(credits / perVideo),
-        }),
+        label:
+          credits >= perLongVideo
+            ? m['landing.pricing.feature_videos_lengths']({
+                short: Math.floor(credits / perVideo),
+                long: Math.floor(credits / perLongVideo),
+              })
+            : m['landing.pricing.feature_videos_short_only']({
+                short: Math.floor(credits / perVideo),
+                credits: perLongVideo.toLocaleString('en-US'),
+              }),
       },
       { icon: MonitorPlay, label: m['landing.pricing.feature_hd']() },
       ...extra,
@@ -115,7 +126,7 @@ export function Pricing({
     const interval = product.plan?.interval;
     // Yearly plans are shown as their monthly equivalent, billed yearly.
     const yearly = interval === 'year';
-    return {
+    const card: PricingPlan = {
       id: productId,
       name: opts.name,
       description: yearly
@@ -128,7 +139,12 @@ export function Pricing({
       interval: interval ? m['landing.pricing.per_month']() : undefined,
       featured: opts.featured,
       badge: opts.badge,
-      highlight: opts.highlight,
+      // Every plan that earns the first-order bonus says so.
+      highlight:
+        opts.highlight ??
+        (qualifiesForFirstOrderBonus(product)
+          ? m['landing.pricing.first_order_bonus']()
+          : undefined),
       features: features(product.credits, opts.extra ?? []),
       productId,
       priceInCents: product.priceInCents,
@@ -137,6 +153,7 @@ export function Pricing({
       plan: product.plan,
       buttonText: product.plan ? undefined : m['landing.pricing.buy_now'](),
     };
+    return card;
   }
 
   const packExtra = [
@@ -180,13 +197,10 @@ export function Pricing({
     {
       key: 'one-time',
       label: m['landing.pricing.one_time'](),
-      badge: m['landing.pricing.first_order_tab'](),
       plans: [
         plan('pack_starter', {
           name: m['landing.pricing.pack_starter'](),
           description: m['landing.pricing.pack_desc'](),
-          badge: m['landing.pricing.first_order_badge'](),
-          highlight: m['landing.pricing.first_order_bonus'](),
           extra: packExtra,
         }),
         plan('pack_standard', {
@@ -307,8 +321,9 @@ export function Pricing({
             {m['landing.pricing.description']()}
           </p>
           <p className="text-muted-foreground mt-2 text-sm">
-            {m['landing.pricing.per_video']({
-              credits: perVideo.toLocaleString('en-US'),
+            {m['landing.pricing.per_video_lengths']({
+              short: perVideo.toLocaleString('en-US'),
+              long: perLongVideo.toLocaleString('en-US'),
             })}
           </p>
         </div>

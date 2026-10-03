@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { FalProvider } from '@/core/ai';
 import { getAuth } from '@/core/auth';
 import { getAllConfigs } from '@/modules/config/service';
+import { screenPrompt } from '@/modules/content-safety/service';
 import {
   countAllPreviews,
   countVisitorPreviews,
@@ -131,6 +132,9 @@ async function POST({ request }: { request: Request }) {
     }
 
     const configs = await getAllConfigs();
+    if (!(await screenPrompt(input.direction, configs)).allowed) {
+      return respErr(DIRECTION_BLOCKED);
+    }
     const ids = visitor(request);
     const { userId, admin } = await isAdmin(request);
     const quota = await freeLeft(request, configs, ids, admin);

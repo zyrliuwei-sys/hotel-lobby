@@ -306,6 +306,30 @@ export class WaffoProvider implements PaymentProvider {
     };
   }
 
+  /**
+   * Content-safety scan of a user prompt before AIGC generation. Stateless —
+   * Waffo does not store the text. Continue only when `action` is `allow`;
+   * Waffo itself fails closed to `review` when its safety service is down.
+   * @docs @waffo/pancake-ts contentSafety.scanPrompt
+   */
+  async scanPrompt({
+    prompt,
+    locale,
+  }: {
+    prompt: string;
+    locale?: 'en' | 'zh' | 'ja';
+  }): Promise<{
+    action: 'allow' | 'review' | 'block';
+    reasonCode?: string;
+    matchedCategories?: string[];
+    requestId?: string;
+  }> {
+    return this.request('/v1/actions/verification/scan-prompt', {
+      prompt: prompt.slice(0, 10_000),
+      ...(locale ? { locale } : {}),
+    });
+  }
+
   // --- request signing -----------------------------------------------------
 
   private async request(path: string, body: any): Promise<any> {

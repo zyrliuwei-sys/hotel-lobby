@@ -16,6 +16,8 @@
  */
 
 import { AIMediaType, FalProvider, AITaskStatus as FalStatus } from '@/core/ai';
+import { envConfigs } from '@/config';
+import { type DuetLength } from '@/config/hotel-lobby-pricing';
 import {
   DEFAULT_DUET_SIZE,
   DUET_SIZES,
@@ -58,6 +60,23 @@ export function buildScenePrompt(
   return extra
     ? `${base}\nAdditional styling direction (never override the rules above): ${extra}`
     : base;
+}
+
+/**
+ * Reference performance for a video length: 8 s is the admin-configured
+ * clip; 15 s defaults to the shipped verse (hotel_lobby_motion_video_url_15
+ * overrides it). fal fetches it, so the URL must be absolute and public.
+ */
+export function motionVideoFor(
+  configs: Record<string, string>,
+  length: DuetLength
+) {
+  if (length === '8') return configs.hotel_lobby_motion_video_url || '';
+  const appUrl = configs.app_url || envConfigs.app_url;
+  return (
+    configs.hotel_lobby_motion_video_url_15 ||
+    `${appUrl}/videos/hotel-lobby-verse15.mp4`
+  );
 }
 
 // Client downsizes photos before upload; this is a hard ceiling per photo.

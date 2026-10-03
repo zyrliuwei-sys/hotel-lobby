@@ -10,12 +10,15 @@ import {
   type ErrorComponentProps,
 } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
+import dmSansLatinUrl from '@fontsource-variable/dm-sans/files/dm-sans-latin-wght-normal.woff2?url';
+import bebasLatinUrl from '@fontsource/bebas-neue/files/bebas-neue-latin-400-normal.woff2?url';
 import { ThemeProvider } from 'next-themes';
 
 import { envConfigs } from '@/config';
 import { getQueryClient } from '@/lib/query-client';
 import { getLocale } from '@/paraglide/runtime.js';
 import { Ads } from '@/components/analytics/ads';
+import { Clarity } from '@/components/analytics/clarity';
 import { GoogleAnalytics } from '@/components/analytics/google-analytics';
 import { Plausible } from '@/components/analytics/plausible';
 import { CustomerService } from '@/components/customer-service';
@@ -23,8 +26,7 @@ import { GoogleOneTap } from '@/components/google-one-tap';
 import { SandboxPreviewBridge } from '@/components/sandbox-preview-bridge';
 import { Toaster } from '@/components/ui/sonner';
 
-import '@fontsource-variable/dm-sans';
-import '@fontsource/bebas-neue/400.css';
+import '@/styles/fonts.css';
 import '@/styles/globals.css';
 
 // Analytics IDs live in the DB config (1h-cached service). Fetched via a
@@ -36,6 +38,7 @@ const getAnalyticsConfigs = createServerFn().handler(async () => {
     gaId: configs.google_analytics_id?.trim() || '',
     plausibleDomain: configs.plausible_domain?.trim() || '',
     plausibleSrc: configs.plausible_src?.trim() || '',
+    clarityProjectId: configs.clarity_project_id?.trim() || '',
     adsenseCode: configs.adsense_code?.trim() || '',
     crispWebsiteId:
       configs.crisp_enabled === 'true'
@@ -63,6 +66,22 @@ export const Route = createRootRoute({
         { name: 'description', content: envConfigs.app_description },
       ],
       links: [
+        // Preload the latin display/body fonts (declared in styles/fonts.css
+        // with font-display: optional) so they make the first paint.
+        {
+          rel: 'preload',
+          as: 'font',
+          type: 'font/woff2',
+          href: bebasLatinUrl,
+          crossOrigin: 'anonymous',
+        },
+        {
+          rel: 'preload',
+          as: 'font',
+          type: 'font/woff2',
+          href: dmSansLatinUrl,
+          crossOrigin: 'anonymous',
+        },
         { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
         { rel: 'apple-touch-icon', href: '/favicon.svg' },
       ],
@@ -97,6 +116,9 @@ function RootComponent() {
             domain={analytics.plausibleDomain}
             src={analytics.plausibleSrc || undefined}
           />
+        ) : null}
+        {analytics?.clarityProjectId ? (
+          <Clarity projectId={analytics.clarityProjectId} />
         ) : null}
         {analytics?.adsenseCode ? <Ads code={analytics.adsenseCode} /> : null}
         <CustomerService

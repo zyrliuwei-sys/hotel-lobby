@@ -2,7 +2,11 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { AIMediaType, FalProvider } from '@/core/ai';
 import { getAuth } from '@/core/auth';
-import { resolveDuetCredits } from '@/config/hotel-lobby-pricing';
+import {
+  DEFAULT_DUET_LENGTH,
+  isDuetLength,
+  resolveDuetCreditsFor,
+} from '@/config/hotel-lobby-pricing';
 import { DEFAULT_DUET_SIZE, isDuetSize } from '@/config/hotel-lobby-sizes';
 import {
   AITaskStatus,
@@ -23,6 +27,7 @@ import { hasPermission } from '@/modules/rbac/service';
 import { respData, respErr } from '@/lib/resp';
 
 import {
+  motionVideoFor,
   PIPELINE_MODEL,
   REFINE_PROMPT,
   submitMotion,
@@ -64,12 +69,15 @@ async function POST({ request }: { request: Request }) {
 
     const configs = await getAllConfigs();
     const isAdmin = await hasPermission(userId, 'admin.*');
-    const price = resolveDuetCredits(configs);
+    const length = isDuetLength(body?.length)
+      ? body.length
+      : DEFAULT_DUET_LENGTH;
+    const price = resolveDuetCreditsFor(configs, length);
     if (!isAdmin && (await getBalance(userId)) < price) {
       return respErr('Insufficient credits');
     }
     if (!configs.fal_api_key) return respErr('Generation is not configured');
-    const motionVideoUrl = configs.hotel_lobby_motion_video_url;
+    const motionVideoUrl = motionVideoFor(configs, length);
     if (!motionVideoUrl) return respErr('Reference video is not configured');
 
     const task = await createTask({

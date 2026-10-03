@@ -2,7 +2,11 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { AIMediaType, FalProvider } from '@/core/ai';
 import { getAuth } from '@/core/auth';
-import { resolveDuetCredits } from '@/config/hotel-lobby-pricing';
+import {
+  DEFAULT_DUET_LENGTH,
+  isDuetLength,
+  resolveDuetCreditsFor,
+} from '@/config/hotel-lobby-pricing';
 import {
   AITaskStatus,
   createTask,
@@ -10,6 +14,7 @@ import {
   updateTask,
 } from '@/modules/ai-tasks/service';
 import { getAllConfigs } from '@/modules/config/service';
+import { screenPrompt } from '@/modules/content-safety/service';
 import { getBalance } from '@/modules/credits/service';
 import { hasPermission } from '@/modules/rbac/service';
 import { respData, respErr } from '@/lib/resp';
@@ -17,6 +22,7 @@ import { respData, respErr } from '@/lib/resp';
 import { DIRECTION_BLOCKED, isBlockedDirection } from './-direction-filter';
 import {
   buildScenePrompt,
+  motionVideoFor,
   parseSceneInput,
   PIPELINE_MODEL,
   submitScene,
@@ -38,17 +44,23 @@ async function POST({ request }: { request: Request }) {
     const { photos, direction, size } = input;
 
     const configs = await getAllConfigs();
+    if (!(await screenPrompt(direction, configs)).allowed) {
+      return respErr(DIRECTION_BLOCKED);
+    }
 
     // Admins generate free; everyone else pays 7× the fal cost in credits.
     // Checked first so an unpaid user always lands on the paywall.
     const isAdmin = await hasPermission(session.user.id, 'admin.*');
-    const price = resolveDuetCredits(configs);
+    const length = isDuetLength(body?.length)
+      ? body.length
+      : DEFAULT_DUET_LENGTH;
+    const price = resolveDuetCreditsFor(configs, length);
     if (!isAdmin && (await getBalance(session.user.id)) < price) {
       return respErr('Insufficient credits');
     }
 
     if (!configs.fal_api_key) return respErr('Generation is not configured');
-    const motionVideoUrl = configs.hotel_lobby_motion_video_url;
+    const motionVideoUrl = motionVideoFor(configs, length);
     if (!motionVideoUrl) return respErr('Reference video is not configured');
 
     const prompt = buildScenePrompt(direction, size);

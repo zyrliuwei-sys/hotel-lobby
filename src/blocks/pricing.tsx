@@ -35,9 +35,10 @@ const PaymentProviderModal = lazy(() =>
   }))
 );
 
+// $9.9 rather than $9.90; whole dollars stay $23.
 function usd(cents: number) {
   return `$${(cents / 100).toLocaleString('en-US', {
-    minimumFractionDigits: cents % 100 ? 2 : 0,
+    minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })}`;
 }
@@ -162,14 +163,12 @@ export function Pricing({
     return card;
   }
 
-  // "N videos for $X — about $Y each" on the starter card.
+  // "Only $Y per video" on the starter card.
   function starterValue() {
     const product = pricingCatalog.pack_starter;
     const count = Math.floor(product.credits / perVideo);
     if (count < 2) return undefined;
     return m['landing.pricing.starter_value']({
-      count,
-      price: usd(product.priceInCents),
       each: usd(Math.round(product.priceInCents / count)),
     });
   }

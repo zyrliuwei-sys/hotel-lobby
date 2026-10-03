@@ -1074,5 +1074,5 @@
   "landing.pricing.feature_videos_lengths": "约 {short} 个 8 秒或 {long} 个 15 秒双人视频",
   "landing.pricing.per_video_lengths": "8 秒双人视频 {short} 积分 · 15 秒双人视频 {long} 积分",
   "landing.pricing.feature_videos_short_only": "约 {short} 个 8 秒双人视频（15 秒需 {credits} 积分）",
-  "landing.pricing.starter_value": "{count} 个双人视频只要 {price}，约 {each}/个"
+  "landing.pricing.starter_value": "每个视频仅 {each}"
 }

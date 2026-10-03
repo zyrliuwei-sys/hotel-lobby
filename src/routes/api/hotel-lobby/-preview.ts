@@ -9,8 +9,9 @@ export const DEVICE_COOKIE = 'hl_did';
 export const FREE_PREVIEW_USED = 'FREE_PREVIEW_USED';
 export const FREE_PREVIEW_PAUSED = 'FREE_PREVIEW_PAUSED';
 
-// ~$0.02 each and ~8 previews per paying user — cap the daily giveaway.
-const DEFAULT_DAILY_CAP = 50;
+// ~$0.02 each; real traffic is 80+/day, and when the cap is hit every new
+// visitor loses the free preview (the main conversion step), so keep headroom.
+const DEFAULT_DAILY_CAP = 200;
 const DEFAULT_PER_VISITOR = 1;
 
 function readNumber(value: string | undefined, fallback: number) {

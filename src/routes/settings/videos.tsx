@@ -83,7 +83,7 @@ function VideosPage() {
                     controls
                     playsInline
                     preload="metadata"
-                    className="size-full object-cover"
+                    className="size-full bg-black object-contain"
                   />
                 ) : v.sceneImageUrl ? (
                   <img

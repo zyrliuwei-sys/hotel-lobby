@@ -544,8 +544,9 @@
   border: 1px solid var(--hl-line);
   background: var(--hl-surface);
 }
-/* Every scene and video is 9:16 now; match it and fill edge to edge (cover
-   also trims the few-pixel mismatch of 694×1230 videos and the 2:3 sample). */
+/* Every new scene and video is 9:16: the frame matches, stills fill it edge
+   to edge. Videos are shown whole (contain) so an older square or landscape
+   one isn't cropped; a 694×1230 video leaves at most a hairline. */
 .hl-preview-media {
   aspect-ratio: 9 / 16;
   overflow: hidden;
@@ -558,6 +559,10 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.hl-preview-media video {
+  object-fit: contain;
+  background: #000;
 }
 .hl-preview-caption {
   display: flex;

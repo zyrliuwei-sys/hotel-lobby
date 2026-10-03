@@ -975,7 +975,7 @@ export function getSettings(): Setting[] {
       name: 'hotel_lobby_free_preview_cap',
       title: 'Free previews per day (site-wide)',
       type: 'number',
-      placeholder: '50 (default; 0 = turn free previews off)',
+      placeholder: '200 (default; 0 = turn free previews off)',
       group: 'hotel_lobby',
       tab: 'ai',
     },

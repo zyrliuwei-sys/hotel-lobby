@@ -8,6 +8,7 @@ import { Link, useRouter } from '@/core/i18n/navigation';
 import { envConfigs } from '@/config';
 import { apiPost } from '@/lib/api-client';
 import { resolveAfterAuthUrl, safeInternalPath } from '@/lib/redirect';
+import { track } from '@/lib/track';
 import { m } from '@/paraglide/messages.js';
 import { localizeHref } from '@/paraglide/runtime.js';
 import { usePublicConfig } from '@/hooks/use-public-config';
@@ -21,18 +22,15 @@ import {
   FieldSeparator,
 } from '@/components/ui/field';
 
-const signUpSchema = z
-  .object({
-    name: z.string().min(1),
-    email: z.string().email(m['common.sign.email_placeholder']()),
-    password: z.string().min(8),
-    confirmPassword: z.string().min(8),
-    inviteCode: z.string(),
-  })
-  .refine((d) => d.password === d.confirmPassword, {
-    path: ['confirmPassword'],
-    message: m['common.sign.password_mismatch'](),
-  });
+// Kept short on purpose: name is optional (falls back to the email's local
+// part) and there is no confirm-password field — every extra field costs
+// sign-ups, and a mistyped password is recoverable via reset.
+const signUpSchema = z.object({
+  name: z.string(),
+  email: z.string().email(m['common.sign.email_placeholder']()),
+  password: z.string().min(8),
+  inviteCode: z.string(),
+});
 
 function SignUpPage() {
   const router = useRouter();
@@ -96,7 +94,6 @@ function SignUpPage() {
       name: '',
       email: '',
       password: '',
-      confirmPassword: '',
       inviteCode: '',
     },
     validators: { onSubmit: signUpSchema },
@@ -121,7 +118,7 @@ function SignUpPage() {
         }
 
         const result = await signUp.email({
-          name: value.name,
+          name: value.name.trim() || value.email.split('@')[0],
           email: value.email,
           password: value.password,
         });
@@ -129,6 +126,7 @@ function SignUpPage() {
           setError(result.error.message || 'Sign up failed');
           return;
         }
+        track('sign_up', { method: 'email' });
 
         // Try to redeem when feature is enabled.
         // - Without email verification: we have a session immediately, redeem now.
@@ -163,6 +161,9 @@ function SignUpPage() {
   });
 
   async function handleSocial(provider: 'google' | 'github') {
+    // OAuth leaves the site, and the same button also signs existing users
+    // in, so this is the intent, not a confirmed new account.
+    track('sign_up_social_click', { method: provider });
     await signIn.social({ provider, callbackURL: afterLoginUrl });
   }
 
@@ -259,7 +260,6 @@ function SignUpPage() {
                             field={field}
                             label={m['common.sign.name_title']()}
                             type="text"
-                            required
                             placeholder={m['common.sign.name_placeholder']()}
                           />
                         )}
@@ -284,19 +284,6 @@ function SignUpPage() {
                             required
                             placeholder={m[
                               'common.sign.password_placeholder'
-                            ]()}
-                          />
-                        )}
-                      </form.Field>
-                      <form.Field name="confirmPassword">
-                        {(field) => (
-                          <TextField
-                            field={field}
-                            label={m['common.sign.confirm_password_title']()}
-                            type="password"
-                            required
-                            placeholder={m[
-                              'common.sign.confirm_password_placeholder'
                             ]()}
                           />
                         )}

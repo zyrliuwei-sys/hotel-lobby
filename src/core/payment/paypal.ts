@@ -123,6 +123,8 @@ export class PayPalProvider implements PaymentProvider {
         return_url: order.successUrl,
         cancel_url: order.cancelUrl,
         user_action: 'PAY_NOW',
+        // Digital credits: don't make the buyer enter a shipping address.
+        shipping_preference: 'NO_SHIPPING',
         brand_name: order.description,
       },
     };

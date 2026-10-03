@@ -4,9 +4,11 @@
 
 ## 安装
 
+解压后在 `indexnow-installer` 的上一级目录运行：
+
 ```bash
-node "/Users/wl./Desktop/saas/代码/hotel lobby/tools/indexnow-installer/install.mjs" /path/to/另一个项目
-cd /path/to/另一个项目 && pnpm build
+node indexnow-installer/install.mjs /path/to/你的项目
+cd /path/to/你的项目 && pnpm build
 ```
 
 - 改动前会把被修改的文件备份到 `<项目>/.indexnow-backup-时间戳/`
@@ -36,3 +38,7 @@ key 保存在数据库的 `config` 表里（`indexnow_key`），不需要改环�
 ## 建议
 
 把 `.indexnow-backup-*` 加进目标项目的 `.gitignore`。
+
+## 更新安装包（维护用）
+
+`sync.mjs` 只在 hotel lobby 项目里使用：改了 IndexNow 相关代码后运行 `node tools/indexnow-installer/sync.mjs`，把最新代码同步进安装包，然后重新打包。

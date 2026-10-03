@@ -2,12 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { getAuth } from '@/core/auth';
 import {
-  checkKeyFile,
   getIndexNowKey,
   isValidIndexNowKey,
   keyFileUrl,
   saveIndexNowKey,
-  sitemapUrls,
   submitUrls,
 } from '@/modules/indexnow/service';
 import { hasPermission } from '@/modules/rbac/service';
@@ -25,14 +23,10 @@ async function guard(request: Request, permission: string) {
 
 async function status() {
   const key = await getIndexNowKey();
-  return {
-    key,
-    keyFileUrl: key ? keyFileUrl(key) : null,
-    keyFile: key ? await checkKeyFile(key) : null,
-  };
+  return { key, keyFileUrl: key ? keyFileUrl(key) : null };
 }
 
-// Current key + whether /{key}.txt is live.
+// Current key and its public key-file URL (the page checks it is live).
 async function GET({ request }: { request: Request }) {
   const denied = await guard(request, 'admin.settings.read');
   if (denied) return denied;
@@ -60,7 +54,8 @@ async function PUT({ request }: { request: Request }) {
   }
 }
 
-// Submit URLs: { mode: 'sitemap' } for every sitemap URL, or { urls: [...] }.
+// Submit URLs: { urls: [...] }. The page reads sitemap.xml itself and sends
+// the list, since the Worker can't fetch its own domain.
 async function POST({ request }: { request: Request }) {
   const denied = await guard(request, 'admin.settings.write');
   if (denied) return denied;
@@ -68,12 +63,9 @@ async function POST({ request }: { request: Request }) {
     const key = await getIndexNowKey();
     if (!key) return respErr('Save an IndexNow key first');
     const body = await request.json().catch(() => ({}));
-    const urls: string[] =
-      body?.mode === 'sitemap'
-        ? await sitemapUrls()
-        : Array.isArray(body?.urls)
-          ? body.urls.filter((u: unknown) => typeof u === 'string')
-          : [];
+    const urls: string[] = Array.isArray(body?.urls)
+      ? body.urls.filter((u: unknown) => typeof u === 'string')
+      : [];
     const results = await submitUrls(key, urls);
     return respData({ submitted: urls.length, results });
   } catch (error: any) {

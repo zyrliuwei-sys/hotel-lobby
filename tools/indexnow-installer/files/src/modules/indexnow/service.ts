@@ -5,13 +5,23 @@
  * and is served at `/{key}.txt` (src/routes/{$key}[.]txt.ts) so search
  * engines can verify the site owns it.
  * Spec: https://www.indexnow.org/documentation
+ *
+ * The key-file check and sitemap reading run in the admin's browser: a
+ * Cloudflare Worker can't fetch its own custom domain (HTTP 522).
  */
 
 import { envConfigs } from '@/config';
 import { getAllConfigs, saveConfigs } from '@/modules/config/service';
 
 export const INDEXNOW_CONFIG_KEY = 'indexnow_key';
-export const INDEXNOW_ENDPOINT = 'https://api.indexnow.org/indexnow';
+// Tried in order. Submissions are shared between engines, so one success is
+// enough; the next is only tried on an error such as 429 (Workers egress IPs
+// are shared and can be rate-limited by one endpoint but not another).
+export const INDEXNOW_ENDPOINTS = [
+  'https://api.indexnow.org/indexnow',
+  'https://www.bing.com/indexnow',
+  'https://yandex.com/indexnow',
+];
 const MAX_URLS_PER_POST = 10_000;
 
 /** 8–128 chars of a-z, A-Z, 0-9 and dashes. */
@@ -34,35 +44,6 @@ export function siteOrigin() {
 
 export function keyFileUrl(key: string) {
   return `${siteOrigin()}/${key}.txt`;
-}
-
-/** Does the live site serve the key file with exactly the key in it? */
-export async function checkKeyFile(key: string) {
-  const url = keyFileUrl(key);
-  try {
-    const res = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } });
-    const body = res.ok ? (await res.text()).trim() : '';
-    return { url, ok: body === key, status: res.status };
-  } catch (error: any) {
-    return { url, ok: false, status: 0, error: error?.message as string };
-  }
-}
-
-/** Every <loc> in the site's sitemap (follows one level of sitemap index). */
-export async function sitemapUrls() {
-  const locs = async (url: string) => {
-    const res = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } });
-    if (!res.ok) throw new Error(`Sitemap ${url} returned ${res.status}`);
-    const xml = await res.text();
-    const found = [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map((m) =>
-      m[1].replace(/&amp;/g, '&')
-    );
-    return { xml, found };
-  };
-  const root = await locs(`${siteOrigin()}/sitemap.xml`);
-  if (!/<sitemapindex/i.test(root.xml)) return root.found;
-  const nested = await Promise.all(root.found.map((u) => locs(u)));
-  return nested.flatMap((n) => n.found);
 }
 
 const MEANINGS: Record<number, string> = {
@@ -99,21 +80,38 @@ export async function submitUrls(key: string, urls: string[]) {
   const results = [];
   for (let i = 0; i < list.length; i += MAX_URLS_PER_POST) {
     const batch = list.slice(i, i + MAX_URLS_PER_POST);
-    const res = await fetch(INDEXNOW_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      body: JSON.stringify({
-        host,
-        key,
-        keyLocation: keyFileUrl(key),
-        urlList: batch,
-      }),
+    const body = JSON.stringify({
+      host,
+      key,
+      keyLocation: keyFileUrl(key),
+      urlList: batch,
     });
+    const attempts: { endpoint: string; status: number; meaning: string }[] =
+      [];
+    for (const endpoint of INDEXNOW_ENDPOINTS) {
+      let status = 0;
+      let meaning: string;
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body,
+        });
+        status = res.status;
+        meaning = MEANINGS[status] ?? (await res.text()).slice(0, 200);
+      } catch (error: any) {
+        meaning = error?.message || 'Network error';
+      }
+      attempts.push({ endpoint: new URL(endpoint).host, status, meaning });
+      if (status === 200 || status === 202) break;
+      // A bad request or key won't get better on another engine.
+      if (status === 400 || status === 403 || status === 422) break;
+    }
+    const last = attempts[attempts.length - 1];
     results.push({
-      status: res.status,
-      ok: res.status === 200 || res.status === 202,
-      meaning: MEANINGS[res.status] ?? (await res.text()).slice(0, 200),
+      ok: last.status === 200 || last.status === 202,
       count: batch.length,
+      attempts,
     });
   }
   return results;

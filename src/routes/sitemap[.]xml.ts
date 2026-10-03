@@ -18,23 +18,31 @@ function urlFor(path: string, locale: string): string {
   }).href;
 }
 
+// One <url> per language version, each listing every alternate (Google's
+// recommended hreflang form) — so /zh pages are real <loc>s that crawlers and
+// the IndexNow sitemap submit pick up, not just alternates of the en page.
 function entryXml(e: Entry): string {
-  const alternates = locales
-    .map(
+  const alternates = [
+    ...locales.map(
       (loc) =>
         `    <xhtml:link rel="alternate" hreflang="${loc}" href="${urlFor(e.path, loc)}"/>`
+    ),
+    `    <xhtml:link rel="alternate" hreflang="x-default" href="${urlFor(e.path, baseLocale)}"/>`,
+  ].join('\n');
+  return locales
+    .map((loc) =>
+      [
+        '  <url>',
+        `    <loc>${urlFor(e.path, loc)}</loc>`,
+        alternates,
+        e.lastModified ? `    <lastmod>${e.lastModified}</lastmod>` : null,
+        `    <changefreq>${e.changeFrequency}</changefreq>`,
+        `    <priority>${e.priority}</priority>`,
+        '  </url>',
+      ]
+        .filter(Boolean)
+        .join('\n')
     )
-    .join('\n');
-  return [
-    '  <url>',
-    `    <loc>${urlFor(e.path, baseLocale)}</loc>`,
-    alternates,
-    e.lastModified ? `    <lastmod>${e.lastModified}</lastmod>` : null,
-    `    <changefreq>${e.changeFrequency}</changefreq>`,
-    `    <priority>${e.priority}</priority>`,
-    '  </url>',
-  ]
-    .filter(Boolean)
     .join('\n');
 }
 

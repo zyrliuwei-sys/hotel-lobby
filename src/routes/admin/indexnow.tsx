@@ -19,18 +19,50 @@ import {
 } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 
-type Status = {
-  key: string | null;
-  keyFileUrl: string | null;
-  keyFile: { url: string; ok: boolean; status: number; error?: string } | null;
-};
+type Status = { key: string | null; keyFileUrl: string | null };
 
 type SubmitResult = {
   submitted: number;
-  results: { status: number; ok: boolean; meaning: string; count: number }[];
+  results: {
+    ok: boolean;
+    count: number;
+    attempts: { endpoint: string; status: number; meaning: string }[];
+  }[];
 };
 
 const QUERY_KEY = ['admin-indexnow'];
+
+// Same-origin reads done in the browser on purpose: the server (a Cloudflare
+// Worker) can't fetch its own custom domain — that returns HTTP 522.
+async function checkKeyFile(key: string) {
+  const res = await fetch(`/${key}.txt`, { cache: 'no-store' });
+  const body = res.ok ? (await res.text()).trim() : '';
+  return { ok: body === key, status: res.status };
+}
+
+async function readSitemap(): Promise<string[]> {
+  const locs = async (url: string) => {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
+    const doc = new DOMParser().parseFromString(
+      await res.text(),
+      'application/xml'
+    );
+    const found = [...doc.getElementsByTagName('loc')]
+      .map((el) => el.textContent?.trim() ?? '')
+      .filter(Boolean);
+    return {
+      isIndex: !!doc.getElementsByTagName('sitemapindex').length,
+      found,
+    };
+  };
+  const root = await locs('/sitemap.xml');
+  if (!root.isIndex) return root.found;
+  const nested = await Promise.all(
+    root.found.map((u) => locs(new URL(u).pathname))
+  );
+  return nested.flatMap((n) => n.found);
+}
 
 const keySchema = z.object({
   key: z
@@ -50,24 +82,33 @@ function IndexNowPage() {
   });
   const status = statusQuery.data;
 
+  const keyFileQuery = useQuery({
+    queryKey: [...QUERY_KEY, 'key-file', status?.key],
+    queryFn: () => checkKeyFile(status!.key!),
+    enabled: !!status?.key,
+  });
+
   const saveKey = useMutation({
     mutationFn: (key: string) => apiPut<Status>('/api/admin/indexnow', { key }),
     onSuccess: (data) => {
       queryClient.setQueryData(QUERY_KEY, data);
+      queryClient.invalidateQueries({ queryKey: [...QUERY_KEY, 'key-file'] });
       toast.success(m['admin.indexnow.saved']());
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const submit = useMutation({
-    mutationFn: (body: { mode: 'sitemap' } | { urls: string[] }) =>
-      apiPost<SubmitResult>('/api/admin/indexnow', body),
+    mutationFn: async (source: 'sitemap' | string[]) =>
+      apiPost<SubmitResult>('/api/admin/indexnow', {
+        urls: source === 'sitemap' ? await readSitemap() : source,
+      }),
     onSuccess: (data) => {
       setResult(data);
       if (data.results.every((r) => r.ok)) {
         toast.success(m['admin.indexnow.submitted']({ count: data.submitted }));
       } else {
-        toast.error(data.results.find((r) => !r.ok)?.meaning);
+        toast.error(data.results.find((r) => !r.ok)?.attempts.at(-1)?.meaning);
       }
     },
     onError: (e: Error) => toast.error(e.message),
@@ -88,7 +129,7 @@ function IndexNowPage() {
     }
   }, [status?.key]);
 
-  const keyFile = status?.keyFile;
+  const keyFile = keyFileQuery.data;
 
   return (
     <div className="space-y-6 p-6">
@@ -154,9 +195,15 @@ function IndexNowPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {statusQuery.isPending ? (
-            <Loader2 className="text-muted-foreground size-4 animate-spin" />
-          ) : !keyFile ? (
+          {statusQuery.isPending || keyFileQuery.isPending ? (
+            status && !status.key ? (
+              <p className="text-muted-foreground text-sm">
+                {m['admin.indexnow.no_key']()}
+              </p>
+            ) : (
+              <Loader2 className="text-muted-foreground size-4 animate-spin" />
+            )
+          ) : !keyFile || !status?.keyFileUrl ? (
             <p className="text-muted-foreground text-sm">
               {m['admin.indexnow.no_key']()}
             </p>
@@ -169,11 +216,11 @@ function IndexNowPage() {
               )}
               <a
                 className="inline-flex items-center gap-1 font-mono break-all underline"
-                href={keyFile.url}
+                href={status.keyFileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                {keyFile.url}
+                {status.keyFileUrl}
                 <ExternalLink className="size-3" />
               </a>
               <span
@@ -190,10 +237,10 @@ function IndexNowPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => statusQuery.refetch()}
-            disabled={statusQuery.isFetching}
+            onClick={() => keyFileQuery.refetch()}
+            disabled={!status?.key || keyFileQuery.isFetching}
           >
-            {statusQuery.isFetching && (
+            {keyFileQuery.isFetching && (
               <Loader2 className="size-4 animate-spin" />
             )}
             {m['admin.indexnow.recheck']()}
@@ -210,7 +257,7 @@ function IndexNowPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <Button
-            onClick={() => submit.mutate({ mode: 'sitemap' })}
+            onClick={() => submit.mutate('sitemap')}
             disabled={!status?.key || submit.isPending}
           >
             {submit.isPending && <Loader2 className="size-4 animate-spin" />}
@@ -226,12 +273,12 @@ function IndexNowPage() {
             <Button
               variant="outline"
               onClick={() =>
-                submit.mutate({
-                  urls: urls
+                submit.mutate(
+                  urls
                     .split(/\s+/)
                     .map((u) => u.trim())
-                    .filter(Boolean),
-                })
+                    .filter(Boolean)
+                )
               }
               disabled={!status?.key || !urls.trim() || submit.isPending}
             >
@@ -243,14 +290,21 @@ function IndexNowPage() {
               <p className="font-medium">
                 {m['admin.indexnow.result_count']({ count: result.submitted })}
               </p>
-              {result.results.map((r, i) => (
-                <p
-                  key={i}
-                  className={r.ok ? 'text-green-600' : 'text-destructive'}
-                >
-                  HTTP {r.status} · {r.meaning} ({r.count})
-                </p>
-              ))}
+              {result.results.flatMap((r, i) =>
+                r.attempts.map((a, j) => (
+                  <p
+                    key={`${i}-${j}`}
+                    className={
+                      a.status === 200 || a.status === 202
+                        ? 'text-green-600'
+                        : 'text-destructive'
+                    }
+                  >
+                    {a.endpoint} · HTTP {a.status || '—'} · {a.meaning} (
+                    {r.count})
+                  </p>
+                ))
+              )}
             </div>
           )}
         </CardContent>

@@ -165,16 +165,6 @@ export function Pricing({
     return card;
   }
 
-  // "Only $Y per video" on the starter card.
-  function starterValue() {
-    const product = pricingCatalog.pack_starter;
-    const count = Math.floor(product.credits / perVideo);
-    if (count < 2) return undefined;
-    return m['landing.pricing.starter_value']({
-      each: usd(Math.round(product.priceInCents / count)),
-    });
-  }
-
   const packExtra = [
     {
       icon: InfinityIcon,
@@ -220,9 +210,8 @@ export function Pricing({
         plan('pack_starter', {
           name: m['landing.pricing.pack_starter'](),
           description: m['landing.pricing.pack_desc'](),
-          highlight: starterValue(),
-          // One-time packs keep the normal frame; the orange ring is for
-          // monthly plans with the first-order bonus.
+          // The first-order bonus shows on every card; keep the orange ring
+          // for the featured plans.
           plainFrame: true,
           extra: packExtra,
         }),

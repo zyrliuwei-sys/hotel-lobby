@@ -1044,7 +1044,7 @@
   "settings.videos.status_failed": "生成失败，积分已退回",
   "settings.videos.prev": "上一页",
   "settings.videos.next": "下一页",
-  "landing.pricing.first_order_bonus": "首次订阅月付套餐加送 1 个 8 秒视频",
+  "landing.pricing.first_order_bonus": "首次购买加送 1 个 8 秒视频",
   "hotel.create.direction_blocked": "这条造型要求不被允许。请保持内容健康，不要包含性暗示或色情内容。",
   "admin.nav.indexnow": "IndexNow",
   "admin.indexnow.title": "IndexNow",
@@ -1075,6 +1075,5 @@
   "hotel.create.length_credits": "积分",
   "landing.pricing.feature_videos_lengths": "约 {short} 个 8 秒或 {long} 个 15 秒双人视频",
   "landing.pricing.per_video_lengths": "8 秒双人视频 {short} 积分 · 15 秒双人视频 {long} 积分",
-  "landing.pricing.feature_videos_short_only": "约 {short} 个 8 秒双人视频（15 秒需 {credits} 积分）",
-  "landing.pricing.starter_value": "每个视频仅 {each}"
+  "landing.pricing.feature_videos_short_only": "约 {short} 个 8 秒双人视频（15 秒需 {credits} 积分）"
 }

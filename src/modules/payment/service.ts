@@ -175,6 +175,16 @@ async function getPaymentManager(): Promise<PaymentManager> {
 
 // --- Checkout ---
 
+function withPurchaseParams(url: string, params: Record<string, string>) {
+  try {
+    const u = new URL(url);
+    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export async function createCheckout(params: {
   userId: string;
   userEmail?: string;
@@ -220,8 +230,16 @@ export async function createCheckout(params: {
     }
   }
 
-  const finalSuccessUrl =
-    paymentOrder.successUrl || `${appUrl}/settings/billing?success=1`;
+  // `paid`/`plan`/`value` let the landing page report a purchase to
+  // analytics (see usePurchaseTracking); they carry no authority.
+  const finalSuccessUrl = withPurchaseParams(
+    paymentOrder.successUrl || `${appUrl}/settings/billing?success=1`,
+    {
+      paid: orderNo,
+      plan: paymentOrder.productId || '',
+      value: ((paymentOrder.price?.amount || 0) / 100).toFixed(2),
+    }
+  );
   const callbackSuccessUrl = `${appUrl}/api/payment/callback?order_no=${orderNo}&redirect=${encodeURIComponent(finalSuccessUrl)}`;
 
   const session = await pm.createPayment({

@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, like, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, like, ne } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import {
@@ -401,6 +401,22 @@ async function handleCheckoutSuccess(session: any, provider: string) {
 
     // Atomically update order + create subscription + grant credits
     await db().transaction(async (tx: any) => {
+      // 0. Claim the order first. The return-URL callback and the webhook
+      // usually arrive together, and on D1 `transaction` is not isolated, so
+      // the status check above can pass for both. Only the caller that flips
+      // the order to paid goes on to grant credits.
+      const claimed = await tx
+        .update(order)
+        .set({ status: OrderStatus.PAID })
+        .where(
+          and(
+            eq(order.id, existingOrder.id),
+            inArray(order.status, [OrderStatus.CREATED, OrderStatus.PENDING])
+          )
+        )
+        .returning({ id: order.id });
+      if (!claimed.length) return;
+
       // 1. Create subscription if applicable
       if (subscriptionInfo && session.subscriptionId) {
         const subNo = getSnowId();

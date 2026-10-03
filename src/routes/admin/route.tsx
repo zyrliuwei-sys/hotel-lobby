@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import {
+  Activity,
   BadgeCheck,
   CreditCard,
   FolderOpen,
@@ -30,6 +31,12 @@ function AdminLayout() {
       href: '/admin',
       label: m['admin.nav.overview'](),
       icon: LayoutDashboard,
+      group,
+    },
+    {
+      href: '/admin/health',
+      label: m['admin.nav.health'](),
+      icon: Activity,
       group,
     },
     {

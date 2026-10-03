@@ -931,9 +931,10 @@ export function getSettings(): Setting[] {
     },
     {
       name: 'hotel_lobby_motion_video_url',
-      title: 'Reference video URL',
+      title: '8-second reference video URL',
       type: 'text',
-      placeholder: 'https://…/hotel-lobby-reference.mp4 (MP4, ≤30s, 9:16)',
+      placeholder:
+        'Leave empty = /videos/hotel-lobby-reference.mp4 (shipped with the site; MP4, ≤30s, 9:16)',
       group: 'hotel_lobby',
       tab: 'ai',
     },

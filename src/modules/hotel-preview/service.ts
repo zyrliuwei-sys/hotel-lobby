@@ -3,7 +3,7 @@
  * per day plus a site-wide daily cap that bounds the fal bill.
  */
 
-import { and, asc, count, eq, gte, isNull, ne, or } from 'drizzle-orm';
+import { and, asc, count, eq, gte, isNull, ne } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import { hotelPreview, type HotelPreview } from '@/config/db/schema';
@@ -22,21 +22,27 @@ function since() {
 }
 
 /**
- * Previews this visitor started in the last 24h (by IP or device). Failed
- * runs don't count, so a provider error never burns someone's free try.
+ * Previews this visitor started in the last 24h, counted separately per
+ * device and per IP. Failed runs don't count, so a provider error never burns
+ * someone's free try.
  */
 export async function countVisitorPreviews(ipHash: string, deviceId: string) {
-  const [row] = await db()
-    .select({ n: count() })
-    .from(hotelPreview)
-    .where(
-      and(
-        gte(hotelPreview.createdAt, since()),
-        ne(hotelPreview.status, PreviewStatus.FAILED),
-        or(eq(hotelPreview.ipHash, ipHash), eq(hotelPreview.deviceId, deviceId))
-      )
-    );
-  return Number(row?.n ?? 0);
+  const recent = (match: ReturnType<typeof eq>) =>
+    db()
+      .select({ n: count() })
+      .from(hotelPreview)
+      .where(
+        and(
+          gte(hotelPreview.createdAt, since()),
+          ne(hotelPreview.status, PreviewStatus.FAILED),
+          match
+        )
+      );
+  const [[byDevice], [byIp]] = await Promise.all([
+    recent(eq(hotelPreview.deviceId, deviceId)),
+    recent(eq(hotelPreview.ipHash, ipHash)),
+  ]);
+  return { device: Number(byDevice?.n ?? 0), ip: Number(byIp?.n ?? 0) };
 }
 
 /** Previews started site-wide in the last 24h (failed ones included). */

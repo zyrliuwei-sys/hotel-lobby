@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, like } from 'drizzle-orm';
+import { and, desc, eq, isNull, like, ne } from 'drizzle-orm';
 
 import { db } from '@/core/db';
 import {
@@ -467,14 +467,26 @@ async function handleCheckoutSuccess(session: any, provider: string) {
         });
       }
 
-      // 3. First monthly subscription of $23+: bonus credits worth one
-      // 8-second duet video (never the 15 s price), once per user (one-time
-      // packs don't use it up).
+      // 3. First paid order (any product): bonus credits worth one
+      // 8-second duet video (never the 15 s price), once per user. Users who
+      // had already paid before this rule don't get it on a later order.
       const bonusEligible =
         qualifiesForFirstOrderBonus({
-          type: existingOrder.paymentType,
           priceInCents: existingOrder.amount || 0,
         }) &&
+        !(
+          await tx
+            .select({ id: order.id })
+            .from(order)
+            .where(
+              and(
+                eq(order.userId, existingOrder.userId),
+                eq(order.status, OrderStatus.PAID),
+                ne(order.id, existingOrder.id)
+              )
+            )
+            .limit(1)
+        ).length &&
         !(
           await tx
             .select({ id: credit.id })

@@ -160,6 +160,33 @@ function loadSaved(): Saved | null {
   }
 }
 
+// Preview the visitor asked to animate before being sent to sign up.
+const RESUME_KEY = 'hl-resume-animate';
+
+function resumeAnimate(previewId?: string) {
+  try {
+    if (previewId) {
+      localStorage.setItem(
+        RESUME_KEY,
+        JSON.stringify({ previewId, at: Date.now() })
+      );
+    }
+  } catch {}
+}
+
+/** The pending preview id (if fresh), cleared so it only resumes once. */
+function takeResumeAnimate(): string | undefined {
+  try {
+    const raw = localStorage.getItem(RESUME_KEY);
+    if (!raw) return undefined;
+    localStorage.removeItem(RESUME_KEY);
+    const { previewId, at } = JSON.parse(raw);
+    return Date.now() - at < 60 * 60 * 1000 ? previewId : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function saveState(saved: Saved | null) {
   try {
     if (saved) localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
@@ -518,6 +545,7 @@ export function HotelLobbyPage() {
     track('hl_animate_click', { signed_in: user ? 1 : 0 });
     if (!user) {
       track('hl_sign_in_prompt');
+      resumeAnimate(previewId);
       window.location.href = localizeHref(
         `/sign-up?callbackUrl=${encodeURIComponent('/')}`
       );
@@ -528,6 +556,19 @@ export function HotelLobbyPage() {
   };
 
   const previewReady = preview?.status === 'success' && !taskId;
+  // Back from sign-up with the preview they wanted animated: carry on (or show
+  // the plans) without making them find and click the button again.
+  useEffect(() => {
+    if (
+      user &&
+      previewReady &&
+      price !== undefined &&
+      creditsQuery.data !== undefined &&
+      takeResumeAnimate() === previewId
+    ) {
+      startAnimate();
+    }
+  }, [user, previewReady, price, creditsQuery.data, previewId]);
   const previewRunning =
     makePreview.isPending || (!!previewId && preview?.status === 'pending');
   const taskRunning =
@@ -560,8 +601,11 @@ export function HotelLobbyPage() {
     paidError(generate.error) ??
     paidError(animate.error) ??
     (freeError ? null : makePreview.error?.message) ??
-    (preview?.status === 'failed' && !taskId ? preview.error : null) ??
-    (task?.status === 'failed' ? task.error : null) ??
+    // Provider errors mean nothing to the visitor; say what it cost them.
+    (preview?.status === 'failed' && !taskId
+      ? m['hotel.create.preview_failed']()
+      : null) ??
+    (task?.status === 'failed' ? m['hotel.create.video_failed']() : null) ??
     null;
   // The inline status line is easy to miss below the button; also toast.
   useEffect(() => {

@@ -40,20 +40,14 @@ export type PricingProduct = {
  * Keys MUST match what the pricing UI sends as product_id.
  */
 /**
- * First-order bonus (one extra video's worth of credits), granted once per
- * user on their first monthly subscription order of $23 or more. One-time
- * packs don't earn it.
+ * First-order bonus (one 8-second video's worth of credits), granted once per
+ * user on their first paid order — any product, pack or monthly plan, from
+ * the $9.90 starter pack up.
  */
-export const FIRST_ORDER_BONUS_MIN_CENTS = 2300;
+export const FIRST_ORDER_BONUS_MIN_CENTS = 990;
 
-export function qualifiesForFirstOrderBonus(order: {
-  type?: string;
-  priceInCents: number;
-}) {
-  return (
-    order.type === PaymentType.SUBSCRIPTION &&
-    order.priceInCents >= FIRST_ORDER_BONUS_MIN_CENTS
-  );
+export function qualifiesForFirstOrderBonus(order: { priceInCents: number }) {
+  return order.priceInCents >= FIRST_ORDER_BONUS_MIN_CENTS;
 }
 
 export const pricingCatalog: Record<string, PricingProduct> = {

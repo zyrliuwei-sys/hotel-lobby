@@ -63,16 +63,21 @@ export function buildScenePrompt(
 }
 
 /**
- * Reference performance for a video length: 8 s is the admin-configured
- * clip; 15 s defaults to the shipped verse (hotel_lobby_motion_video_url_15
- * overrides it). fal fetches it, so the URL must be absolute and public.
+ * Reference performance for a video length. Each defaults to a shipped clip
+ * (8 s: hotel-lobby-reference.mp4, 15 s: the verse); hotel_lobby_motion_video_url
+ * / _15 override them. fal fetches it, so the URL must be absolute and public.
  */
 export function motionVideoFor(
   configs: Record<string, string>,
   length: DuetLength
 ) {
-  if (length === '8') return configs.hotel_lobby_motion_video_url || '';
   const appUrl = configs.app_url || envConfigs.app_url;
+  if (length === '8') {
+    return (
+      configs.hotel_lobby_motion_video_url ||
+      `${appUrl}/videos/hotel-lobby-reference.mp4`
+    );
+  }
   return (
     configs.hotel_lobby_motion_video_url_15 ||
     `${appUrl}/videos/hotel-lobby-verse15.mp4`
@@ -195,7 +200,11 @@ export async function submitMotion(
   sceneImageUrl: string,
   motionVideoUrl: string
 ) {
-  await mergeTaskInfo(taskId, { sceneImageUrl, motionVideoUrl });
+  await mergeTaskInfo(taskId, {
+    sceneImageUrl,
+    motionVideoUrl,
+    motionClaimedAt: Date.now(),
+  });
   const video = await provider.generate({
     params: {
       mediaType: AIMediaType.VIDEO,
@@ -218,6 +227,7 @@ type Info = {
   motionVideoUrl?: string;
   error?: string;
   persistAttempts?: number;
+  motionClaimedAt?: number;
 };
 
 function parseJson<T>(value: unknown): T {
@@ -315,6 +325,26 @@ export async function repersistTask(task: {
   return true;
 }
 
+/**
+ * A poll that hit fal's rate limit, a 5xx or the network says nothing about
+ * the run itself — it is usually still going, so check again on the next poll
+ * instead of failing a job that's already being paid for. Tasks still stuck
+ * get failed (and refunded) by the cron timeout.
+ */
+function isTransient(error: any) {
+  const message = String(error?.message || '');
+  const status = /request failed with status: (\d{3})/.exec(message)?.[1];
+  if (status) return status === '429' || Number(status) >= 500;
+  return (
+    error instanceof TypeError ||
+    /network|fetch failed|timed? ?out|ECONN|socket/i.test(message)
+  );
+}
+
+// Stage 2 claimed but its request id never saved (the worker died mid-submit):
+// nothing will ever finish it, so fail and refund instead of a 3 h wait.
+const MOTION_SUBMIT_TIMEOUT_MS = 10 * 60 * 1000;
+
 async function fail(taskId: string, message: string) {
   await updateTask({
     taskId,
@@ -352,11 +382,15 @@ export async function advance(taskId: string, provider: FalProvider) {
             AITaskStatus.PROCESSING
           )
         ) {
+          // A failed submit is final, network error or not: no fal job was
+          // (knowingly) started, so refund now rather than wait it out.
           await submitMotion(
             taskId,
             provider,
             sceneImageUrl,
             info.motionVideoUrl!
+          ).catch((error) =>
+            fail(taskId, error?.message || 'Motion transfer failed')
           );
         }
       }
@@ -378,10 +412,19 @@ export async function advance(taskId: string, provider: FalProvider) {
           taskResult: await persistVideo(taskId, res.taskResult),
         });
       }
+    } else if (
+      task.status === AITaskStatus.PROCESSING &&
+      info.motionClaimedAt &&
+      Date.now() - info.motionClaimedAt > MOTION_SUBMIT_TIMEOUT_MS
+    ) {
+      await fail(taskId, 'Motion transfer was never started');
     }
   } catch (error: any) {
-    // fal reports a failed run as COMPLETED + an error on the result fetch.
-    await fail(taskId, error?.message || 'Generation failed');
+    // fal reports a failed run as COMPLETED + an error on the result fetch;
+    // a rate limit / outage / network blip is retried on the next poll.
+    if (!isTransient(error)) {
+      await fail(taskId, error?.message || 'Generation failed');
+    }
   }
 
   task = await findTask(taskId);
@@ -402,6 +445,7 @@ export async function advancePreview(row: PreviewRow, provider: FalProvider) {
       });
     }
   } catch (error: any) {
+    if (isTransient(error)) return;
     await updatePreview(row.id, {
       status: PreviewStatus.FAILED,
       error: error?.message || 'Preview failed',

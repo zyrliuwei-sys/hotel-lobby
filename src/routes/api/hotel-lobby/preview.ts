@@ -59,6 +59,9 @@ async function isAdmin(request: Request) {
   };
 }
 
+// Free previews one IP may use per day, as a multiple of the per-visitor limit.
+const IP_SHARE = 5;
+
 async function freeLeft(
   request: Request,
   configs: Record<string, string>,
@@ -73,8 +76,14 @@ async function freeLeft(
   if ((await countAllPreviews()) >= dailyCap) {
     return { left: 0, reason: FREE_PREVIEW_PAUSED };
   }
+  // Per device, with a looser per-IP ceiling: many real visitors share one
+  // IP (mobile carrier NAT, offices, campuses), so an IP alone mustn't use up
+  // everyone's free try. The ceiling still bounds cookie-clearing reruns.
   const used = await countVisitorPreviews(ids.ipHash, ids.deviceId);
-  const left = Math.max(0, perVisitor - used);
+  const left = Math.max(
+    0,
+    Math.min(perVisitor - used.device, perVisitor * IP_SHARE - used.ip)
+  );
   return { left, reason: left ? null : FREE_PREVIEW_USED };
 }
 

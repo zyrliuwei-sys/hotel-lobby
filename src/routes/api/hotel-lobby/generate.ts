@@ -27,6 +27,7 @@ import {
   PIPELINE_MODEL,
   submitScene,
   taskView,
+  videoSceneQuality,
 } from './-pipeline';
 
 async function POST({ request }: { request: Request }) {
@@ -75,7 +76,13 @@ async function POST({ request }: { request: Request }) {
 
     try {
       const provider = new FalProvider({ apiKey: configs.fal_api_key });
-      const imageRequestId = await submitScene(provider, photos, prompt, size);
+      const imageRequestId = await submitScene(
+        provider,
+        photos,
+        prompt,
+        size,
+        videoSceneQuality(configs)
+      );
       await mergeTaskInfo(task.id, { imageRequestId, motionVideoUrl });
     } catch (error: any) {
       await updateTask({

@@ -26,6 +26,7 @@ import {
   type DuetSize,
 } from '@/config/hotel-lobby-sizes';
 import { apiGet, apiPost } from '@/lib/api-client';
+import { draftDelete, draftGet, draftSet } from '@/lib/draft-store';
 import { track } from '@/lib/track';
 import { m } from '@/paraglide/messages.js';
 import { localizeHref } from '@/paraglide/runtime.js';
@@ -134,6 +135,21 @@ type Saved = { previewId?: string; taskId?: string; at: number };
 const SAVED_KEY = 'hl-duet';
 const SAVED_TTL = 3 * 24 * 60 * 60 * 1000;
 
+// Unsent form (photos + options) kept in IndexedDB so it survives the
+// sign-in redirect (Google OAuth leaves the site) and reloads. Device-local,
+// never uploaded; dropped after a day.
+type Draft = {
+  photoA: File | null;
+  photoB: File | null;
+  direction: string;
+  size: DuetSize;
+  length: DuetLength;
+  consent: boolean;
+  at: number;
+};
+const DRAFT_KEY = 'hl-create-draft';
+const DRAFT_TTL = 24 * 60 * 60 * 1000;
+
 function loadSaved(): Saved | null {
   try {
     const saved = JSON.parse(localStorage.getItem(SAVED_KEY) || 'null');
@@ -234,19 +250,22 @@ async function toDataUrl(file: File, maxSide = 1536): Promise<string> {
 function PhotoInput({
   label,
   side,
+  file,
   onFile,
 }: {
   label: string;
   side: string;
+  file: File | null;
   onFile: (file: File | null) => void;
 }) {
+  // Derived from the file prop so a draft restored after sign-in shows too.
   const [preview, setPreview] = useState<string>();
-  useEffect(
-    () => () => {
-      if (preview) URL.revokeObjectURL(preview);
-    },
-    [preview]
-  );
+  useEffect(() => {
+    if (!file) return setPreview(undefined);
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
   return (
     <label className="hl-upload">
       <input
@@ -260,7 +279,6 @@ function PhotoInput({
             e.target.value = '';
             return;
           }
-          setPreview(file ? URL.createObjectURL(file) : undefined);
           onFile(file);
         }}
       />
@@ -308,6 +326,38 @@ export function HotelLobbyPage() {
       );
     }
   }, []);
+  // Restore the unsent form, then keep it saved. `draftReady` stops the save
+  // effect from overwriting the draft with the empty initial state.
+  const [draftReady, setDraftReady] = useState(false);
+  useEffect(() => {
+    draftGet<Draft>(DRAFT_KEY).then((d) => {
+      if (d && Date.now() - d.at < DRAFT_TTL) {
+        setPhotoA(d.photoA);
+        setPhotoB(d.photoB);
+        setDirection(d.direction);
+        if (OFFERED_DUET_SIZES.includes(d.size)) setSize(d.size);
+        if (d.length in DUET_LENGTHS) setLength(d.length);
+        setConsent(d.consent);
+      }
+      setDraftReady(true);
+    });
+  }, []);
+  useEffect(() => {
+    if (!draftReady) return;
+    if (!photoA && !photoB && !direction.trim()) {
+      draftDelete(DRAFT_KEY);
+      return;
+    }
+    draftSet(DRAFT_KEY, {
+      photoA,
+      photoB,
+      direction,
+      size,
+      length,
+      consent,
+      at: Date.now(),
+    } satisfies Draft);
+  }, [draftReady, photoA, photoB, direction, size, length, consent]);
   // Only ever written here; cleared explicitly by `forget` so a (re)mount
   // with empty state can't wipe what the restore above is about to read.
   useEffect(() => {
@@ -364,10 +414,18 @@ export function HotelLobbyPage() {
     // A preview animated in another tab/session: follow its task.
     if (preview?.animatedTaskId && !taskId) setTaskId(preview.animatedTaskId);
   }, [preview?.status, preview?.animatedTaskId]);
-  // Saved id that no longer exists (or expired): forget it quietly.
+  // Saved id that no longer exists (or expired), or a not-yet-animated preview
+  // in a framing no longer offered (old 1:1 / 3:4 / 16:9): forget it quietly.
   useEffect(() => {
-    if (previewQuery.error) forget();
-  }, [previewQuery.error]);
+    if (
+      previewQuery.error ||
+      (preview &&
+        !preview.animatedTaskId &&
+        !OFFERED_DUET_SIZES.includes(preview.size as DuetSize))
+    ) {
+      forget();
+    }
+  }, [previewQuery.error, preview?.size, preview?.animatedTaskId]);
 
   const onTaskStarted = (task: DuetTask) => {
     setTaskId(task.id);
@@ -502,6 +560,14 @@ export function HotelLobbyPage() {
     makePreview.reset();
     forget();
   };
+  // A preview/video belongs to the photos and framing it was made from:
+  // changing either starts over, so the next click can't animate a stale one.
+  const changeInput =
+    <T,>(set: (value: T) => void) =>
+    (value: T) => {
+      set(value);
+      if (previewId || taskId) reset();
+    };
   const credits = price?.toLocaleString('en-US') ?? '…';
 
   return (
@@ -659,12 +725,14 @@ export function HotelLobbyPage() {
                 <PhotoInput
                   label={m['hotel.create.person_a']()}
                   side={m['hotel.create.left']()}
-                  onFile={setPhotoA}
+                  file={photoA}
+                  onFile={changeInput(setPhotoA)}
                 />
                 <PhotoInput
                   label={m['hotel.create.person_b']()}
                   side={m['hotel.create.right']()}
-                  onFile={setPhotoB}
+                  file={photoB}
+                  onFile={changeInput(setPhotoB)}
                 />
               </div>
               <p className="hl-field-label" id="duet-size-label">
@@ -683,7 +751,7 @@ export function HotelLobbyPage() {
                     aria-checked={size === key}
                     className="hl-size"
                     disabled={running}
-                    onClick={() => setSize(key)}
+                    onClick={() => key !== size && changeInput(setSize)(key)}
                   >
                     <span
                       className="hl-size-shape"

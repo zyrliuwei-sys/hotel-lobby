@@ -116,6 +116,29 @@ export function isSceneQuality(value: unknown): value is SceneQuality {
   return value === 'low' || value === 'medium' || value === 'high';
 }
 
+const QUALITY_RANK: Record<SceneQuality, number> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+};
+
+/**
+ * Quality of the frame the video is made from. Medium by default: side by
+ * side with high it's indistinguishable at the 694×1230 video size, but
+ * renders in ~38 s instead of 65–90 s and costs ~$0.05 instead of ~$0.13
+ * (measured 2026-10-03). Admin can set hotel_lobby_scene_quality to high.
+ */
+export function videoSceneQuality(configs: Record<string, string>) {
+  return isSceneQuality(configs.hotel_lobby_scene_quality)
+    ? configs.hotel_lobby_scene_quality
+    : 'medium';
+}
+
+/** Is a preview still already good enough to animate without re-rendering? */
+export function meetsQuality(have: string, want: SceneQuality) {
+  return isSceneQuality(have) && QUALITY_RANK[have] >= QUALITY_RANK[want];
+}
+
 // Turns a cheap free-preview still into the full-quality frame the video is
 // made from, without re-composing it — the buyer gets the scene they saw.
 export const REFINE_PROMPT = `Re-render this exact image at high quality.
@@ -128,7 +151,7 @@ export async function submitScene(
   photos: string[],
   prompt: string,
   size: DuetSize,
-  quality: SceneQuality = 'high'
+  quality: SceneQuality = 'medium'
 ) {
   const image = await provider.generate({
     params: {

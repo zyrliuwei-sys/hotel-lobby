@@ -7,7 +7,12 @@ import {
   isDuetLength,
   resolveDuetCreditsFor,
 } from '@/config/hotel-lobby-pricing';
-import { DEFAULT_DUET_SIZE, isDuetSize } from '@/config/hotel-lobby-sizes';
+import {
+  DEFAULT_DUET_SIZE,
+  isDuetSize,
+  OFFERED_DUET_SIZES,
+  type DuetSize,
+} from '@/config/hotel-lobby-sizes';
 import {
   AITaskStatus,
   claimTaskStatus,
@@ -27,16 +32,18 @@ import { hasPermission } from '@/modules/rbac/service';
 import { respData, respErr } from '@/lib/resp';
 
 import {
+  meetsQuality,
   motionVideoFor,
   PIPELINE_MODEL,
   REFINE_PROMPT,
   submitMotion,
   submitScene,
   taskView,
+  videoSceneQuality,
 } from './-pipeline';
 
-// Paid step for a free preview: re-render its still at high quality (skipped
-// if the preview already was high), then run the motion transfer. Same price
+// Paid step for a free preview: re-render its still at video quality (skipped
+// if the preview already is that good), then run the motion transfer. Same price
 // as a full run — that price already covers a high-quality scene.
 async function POST({ request }: { request: Request }) {
   try {
@@ -65,6 +72,12 @@ async function POST({ request }: { request: Request }) {
         return respData(taskView(existing));
       }
       return respErr('Preview already used');
+    }
+
+    // Framings no longer offered (1:1, 3:4, 16:9) animate badly against the
+    // 9:16 reference — ask for a fresh preview instead.
+    if (!OFFERED_DUET_SIZES.includes(preview.size as DuetSize)) {
+      return respErr('Preview expired, please make a new one');
     }
 
     const configs = await getAllConfigs();
@@ -101,7 +114,8 @@ async function POST({ request }: { request: Request }) {
 
     try {
       const provider = new FalProvider({ apiKey: configs.fal_api_key });
-      if (preview.quality === 'high') {
+      const quality = videoSceneQuality(configs);
+      if (meetsQuality(preview.quality, quality)) {
         await claimTaskStatus(
           task.id,
           AITaskStatus.PENDING,
@@ -114,7 +128,7 @@ async function POST({ request }: { request: Request }) {
           motionVideoUrl
         );
       } else {
-        // Cheap preview still → re-render at high quality, then the regular
+        // Cheap preview still → re-render at video quality, then the regular
         // pipeline (task polling) runs the motion transfer on that frame.
         const size = isDuetSize(preview.size)
           ? preview.size
@@ -124,7 +138,7 @@ async function POST({ request }: { request: Request }) {
           [preview.sceneImageUrl],
           REFINE_PROMPT,
           size,
-          'high'
+          quality
         );
         await mergeTaskInfo(task.id, { imageRequestId, motionVideoUrl });
       }

@@ -988,6 +988,18 @@ export function getSettings(): Setting[] {
       tab: 'ai',
     },
     {
+      name: 'hotel_lobby_scene_quality',
+      title: 'Video frame quality',
+      type: 'select',
+      options: [
+        { label: 'Medium (default, ~38 s, ~$0.05)', value: 'medium' },
+        { label: 'High (~65–90 s, ~$0.13)', value: 'high' },
+      ],
+      tip: 'Quality of the still each video is animated from. Medium looks the same at video size and is ~45 s faster.',
+      group: 'hotel_lobby',
+      tab: 'ai',
+    },
+    {
       name: 'hotel_lobby_preview_quality',
       title: 'Free preview image quality',
       type: 'select',

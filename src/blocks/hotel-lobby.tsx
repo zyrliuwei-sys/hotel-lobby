@@ -519,7 +519,7 @@ export function HotelLobbyPage() {
     if (!user) {
       track('hl_sign_in_prompt');
       window.location.href = localizeHref(
-        `/sign-in?callbackUrl=${encodeURIComponent('/')}`
+        `/sign-up?callbackUrl=${encodeURIComponent('/')}`
       );
       return;
     }
@@ -873,7 +873,7 @@ export function HotelLobbyPage() {
                 ) : !user ? (
                   <Link
                     className="hl-button"
-                    href={`/sign-in?callbackUrl=${encodeURIComponent('/')}`}
+                    href={`/sign-up?callbackUrl=${encodeURIComponent('/')}`}
                   >
                     {m['hotel.create.sign_in']()} <ArrowRight size={17} />
                   </Link>

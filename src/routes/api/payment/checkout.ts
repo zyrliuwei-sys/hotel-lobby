@@ -74,8 +74,8 @@ async function POST({ request }: { request: Request }) {
     // to a path on this site. The old detour through /auth-callback exists to
     // hand a session token to a desktop client — a browser coming back from
     // checkout is already signed in, and that page isn't part of this app.
-    const finalRedirect = `${baseUrl}${safeRedirectPath}`;
-    const successUrl = `${baseUrl}/api/payment/callback?redirect=${encodeURIComponent(finalRedirect)}`;
+    // createCheckout wraps this in /api/payment/callback?order_no=… itself.
+    const successUrl = `${baseUrl}${safeRedirectPath}`;
     const cancelUrl = `${baseUrl}/pricing`;
 
     const checkout = await createCheckout({

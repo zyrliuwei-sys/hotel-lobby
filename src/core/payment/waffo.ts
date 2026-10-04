@@ -504,10 +504,12 @@ export class WaffoProvider implements PaymentProvider {
         paymentCurrency: currency,
         paymentEmail: data.buyerEmail,
         paymentUserId: data.merchantProvidedBuyerIdentity,
-        paidAt: data.paymentDate
-          ? new Date(data.paymentDate)
-          : event.timestamp
-            ? new Date(event.timestamp)
+        // paymentDate is date-only ("2026-10-03"), so prefer the event's
+        // full timestamp
+        paidAt: event.timestamp
+          ? new Date(event.timestamp)
+          : data.paymentDate
+            ? new Date(data.paymentDate)
             : new Date(),
       },
       // no top-level `id`: the payment service matches orders on out_trade_no

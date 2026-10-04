@@ -210,13 +210,13 @@ export function Pricing({
         plan('pack_starter', {
           name: m['landing.pricing.pack_starter'](),
           description: m['landing.pricing.pack_desc'](),
+          featured: true,
+          badge: m['landing.pricing.popular'](),
           extra: packExtra,
         }),
         plan('pack_standard', {
           name: m['landing.pricing.pack_standard'](),
           description: m['landing.pricing.pack_desc'](),
-          featured: true,
-          badge: m['landing.pricing.popular'](),
           extra: packExtra,
         }),
         plan('pack_pro', {

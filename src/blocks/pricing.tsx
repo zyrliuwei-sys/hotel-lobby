@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { useSession } from '@/core/auth/client';
 import { useRouter } from '@/core/i18n/navigation';
 import { duetCredits } from '@/config/hotel-lobby-pricing';
-import { pricingCatalog, qualifiesForFirstOrderBonus } from '@/config/pricing';
+import { pricingCatalog } from '@/config/pricing';
 import { apiGet, apiPost } from '@/lib/api-client';
 import { currentPathWithQuery } from '@/lib/redirect';
 import { track } from '@/lib/track';
@@ -148,12 +148,7 @@ export function Pricing({
       featured: opts.featured,
       badge: opts.badge,
       plainFrame: opts.plainFrame,
-      // Every plan that earns the first-order bonus says so.
-      highlight:
-        opts.highlight ??
-        (qualifiesForFirstOrderBonus(product)
-          ? m['landing.pricing.first_order_bonus']()
-          : undefined),
+      highlight: opts.highlight,
       features: features(product.credits, opts.extra ?? []),
       productId,
       priceInCents: product.priceInCents,
@@ -207,12 +202,14 @@ export function Pricing({
       key: 'one-time',
       label: m['landing.pricing.one_time'](),
       plans: [
+        plan('pack_single', {
+          name: m['landing.pricing.pack_single'](),
+          description: m['landing.pricing.pack_single_desc'](),
+          extra: packExtra,
+        }),
         plan('pack_starter', {
           name: m['landing.pricing.pack_starter'](),
           description: m['landing.pricing.pack_desc'](),
-          // The first-order bonus shows on every card; keep the orange ring
-          // for the featured plans.
-          plainFrame: true,
           extra: packExtra,
         }),
         plan('pack_standard', {

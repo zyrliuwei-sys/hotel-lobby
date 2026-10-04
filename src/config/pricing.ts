@@ -39,18 +39,19 @@ export type PricingProduct = {
  * yearly plans — check priceInCents / credits ≥ 0.01 before adding a product.
  * Keys MUST match what the pricing UI sends as product_id.
  */
-/**
- * First-order bonus (one 8-second video's worth of credits), granted once per
- * user on their first paid order — any product, pack or monthly plan, from
- * the $9.90 starter pack up.
- */
-export const FIRST_ORDER_BONUS_MIN_CENTS = 990;
-
-export function qualifiesForFirstOrderBonus(order: { priceInCents: number }) {
-  return order.priceInCents >= FIRST_ORDER_BONUS_MIN_CENTS;
-}
-
 export const pricingCatalog: Record<string, PricingProduct> = {
+  pack_single: {
+    productId: 'pack_single',
+    productName: 'Single Video',
+    planName: 'Single Video',
+    description: 'Single Video',
+    type: PaymentType.ONE_TIME,
+    // $4.90 for one 8 s video (440 credits = duetCredits(8)). Added
+    // 2026-10-04 after no paid orders the day the floor moved to $9.90.
+    priceInCents: 490,
+    currency: 'usd',
+    credits: 440,
+  },
   pack_starter: {
     productId: 'pack_starter',
     productName: 'Starter Pack',

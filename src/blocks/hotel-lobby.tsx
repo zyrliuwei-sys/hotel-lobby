@@ -44,8 +44,8 @@ import { FooterBadgeList } from '@/components/footer-badge-list';
 import '@/styles/hotel-lobby.css';
 
 // Popups load on demand: the user menu only exists for signed-in visitors and
-// the paywall only after running out of credits — keep their dialog/menu code
-// out of the homepage's initial JS.
+// the paywall is only needed when a visitor starts the paid flow — keep their
+// dialog/menu code out of the homepage's initial JS.
 const SiteUserMenu = lazy(() =>
   import('@/components/site-user-menu').then((mod) => ({
     default: mod.SiteUserMenu,
@@ -126,10 +126,6 @@ type DuetPreview = {
   error: string | null;
 };
 
-type FreeQuota = { left: number; reason: string | null };
-
-const FREE_PREVIEW_USED = 'FREE_PREVIEW_USED';
-const FREE_PREVIEW_PAUSED = 'FREE_PREVIEW_PAUSED';
 const DIRECTION_BLOCKED = 'DIRECTION_BLOCKED';
 
 type Saved = { previewId?: string; taskId?: string; at: number };
@@ -414,37 +410,6 @@ export function HotelLobbyPage() {
     setPreviewId(undefined);
   };
 
-  const quotaQuery = useQuery({
-    queryKey: ['hotel-lobby-free'],
-    queryFn: () => apiGet<FreeQuota>('/api/hotel-lobby/preview'),
-  });
-  const freeLeft = quotaQuery.data?.left ?? 0;
-
-  const makePreview = useMutation({
-    mutationFn: async () =>
-      apiPost<DuetPreview>('/api/hotel-lobby/preview', {
-        photoA: await toDataUrl(photoA!),
-        photoB: await toDataUrl(photoB!),
-        direction: direction.trim() || undefined,
-        size,
-      }),
-    onMutate: () => track('hl_preview_start', { size }),
-    onSuccess: (preview) => {
-      setTaskId(undefined);
-      setPreviewId(preview.id);
-      queryClient.invalidateQueries({ queryKey: ['hotel-lobby-free'] });
-    },
-    onError: (e: Error) => {
-      if (
-        e.message === FREE_PREVIEW_USED ||
-        e.message === FREE_PREVIEW_PAUSED
-      ) {
-        track('hl_preview_limit', { reason: e.message });
-        queryClient.invalidateQueries({ queryKey: ['hotel-lobby-free'] });
-      }
-    },
-  });
-
   const previewQuery = useQuery({
     queryKey: ['hotel-lobby-preview', previewId],
     queryFn: () =>
@@ -551,7 +516,10 @@ export function HotelLobbyPage() {
     );
   };
   const startGenerate = () => {
-    if (lacksCredits()) return openPaywall();
+    // New visitors must choose a paid plan before any generation request is
+    // submitted. Existing signed-in users with enough credits can still use
+    // their balance directly.
+    if (!user || lacksCredits()) return openPaywall();
     generate.mutate();
   };
   const startAnimate = () => {
@@ -582,42 +550,22 @@ export function HotelLobbyPage() {
       startAnimate();
     }
   }, [user, previewReady, price, creditsQuery.data, previewId]);
-  const previewRunning =
-    makePreview.isPending || (!!previewId && preview?.status === 'pending');
+  const previewRunning = !!previewId && preview?.status === 'pending';
   const taskRunning =
     generate.isPending ||
     animate.isPending ||
     (!!taskId && task?.status !== 'success' && task?.status !== 'failed');
   const running = previewRunning || taskRunning;
-  // Why the free preview isn't offered: from a rejected attempt, or — for a
-  // signed-out visitor — straight from the quota, so the page says "today's
-  // free preview is used" instead of silently showing only "Sign in".
-  const freeReason =
-    makePreview.error?.message ??
-    (!user && !previewId && !taskId && quotaQuery.data?.left === 0
-      ? quotaQuery.data.reason
-      : null);
-  const freeError =
-    freeReason === FREE_PREVIEW_USED
-      ? m['hotel.create.free_used']()
-      : freeReason === FREE_PREVIEW_PAUSED
-        ? m['hotel.create.free_paused']()
-        : null;
   const paidError = (e: Error | null) =>
     e?.message === INSUFFICIENT_CREDITS ? null : e?.message;
   const blockedNote =
-    [generate.error, makePreview.error].some(
+    [generate.error, animate.error].some(
       (e) => e?.message === DIRECTION_BLOCKED
     ) && m['hotel.create.direction_blocked']();
   const error =
     (blockedNote || null) ??
     paidError(generate.error) ??
     paidError(animate.error) ??
-    (freeError ? null : makePreview.error?.message) ??
-    // Provider errors mean nothing to the visitor; say what it cost them.
-    (preview?.status === 'failed' && !taskId
-      ? m['hotel.create.preview_failed']()
-      : null) ??
     (task?.status === 'failed' ? m['hotel.create.video_failed']() : null) ??
     null;
   // The inline status line is easy to miss below the button; also toast.
@@ -627,7 +575,6 @@ export function HotelLobbyPage() {
   const reset = () => {
     generate.reset();
     animate.reset();
-    makePreview.reset();
     forget();
   };
   // A preview/video belongs to the photos and framing it was made from:
@@ -916,24 +863,6 @@ export function HotelLobbyPage() {
                       {m['hotel.create.start_over']()}
                     </button>
                   </>
-                ) : freeLeft > 0 && !taskId ? (
-                  <button
-                    className={`hl-button ${!canGenerate || running ? 'hl-disabled' : ''}`}
-                    type="button"
-                    disabled={!canGenerate || running}
-                    onClick={() => makePreview.mutate()}
-                  >
-                    {running && <Loader2 size={17} className="animate-spin" />}
-                    {m['hotel.create.free_preview']()}
-                    {!running && <ArrowRight size={17} />}
-                  </button>
-                ) : !user ? (
-                  <Link
-                    className="hl-button"
-                    href={`/sign-up?callbackUrl=${encodeURIComponent('/#create')}`}
-                  >
-                    {m['hotel.create.sign_in']()} <ArrowRight size={17} />
-                  </Link>
                 ) : (
                   <button
                     className={`hl-button ${!canGenerate || running ? 'hl-disabled' : ''}`}
@@ -963,9 +892,6 @@ export function HotelLobbyPage() {
               </div>
               {price !== undefined && !previewReady && (
                 <p className="hl-hint">
-                  {freeLeft > 0 && !previewReady && !taskId
-                    ? `${m['hotel.create.free_note']()} `
-                    : ''}
                   {m['hotel.create.cost']({ credits })}{' '}
                   <a href="#pricing">{m['hotel.create.buy_credits']()}</a>
                 </p>
@@ -973,25 +899,21 @@ export function HotelLobbyPage() {
               <p className="hl-hint" role="status" aria-live="polite">
                 {error
                   ? `${m['hotel.create.failed']()}: ${error}`
-                  : freeError
-                    ? freeError
-                    : task?.status === 'success'
-                      ? m['hotel.create.done']()
-                      : generate.isPending
-                        ? m['hotel.create.submitting']()
-                        : task?.stage === 'motion'
-                          ? `${m['hotel.create.stage_motion']()} ${m['hotel.create.keep_open']()}`
-                          : taskId
-                            ? `${m['hotel.create.stage_scene']()} ${m['hotel.create.keep_open']()}`
-                            : previewReady
-                              ? m['hotel.create.preview_ready']({ credits })
-                              : makePreview.isPending
-                                ? m['hotel.create.submitting']()
-                                : previewRunning
-                                  ? m['hotel.create.preview_working']()
-                                  : photoA && photoB
-                                    ? m['hotel.create.ready']()
-                                    : m['hotel.create.hint']()}
+                  : task?.status === 'success'
+                    ? m['hotel.create.done']()
+                    : generate.isPending
+                      ? m['hotel.create.submitting']()
+                      : task?.stage === 'motion'
+                        ? `${m['hotel.create.stage_motion']()} ${m['hotel.create.keep_open']()}`
+                        : taskId
+                          ? `${m['hotel.create.stage_scene']()} ${m['hotel.create.keep_open']()}`
+                          : previewReady
+                            ? m['hotel.create.preview_ready']({ credits })
+                            : previewRunning
+                              ? m['hotel.create.submitting']()
+                              : photoA && photoB
+                                ? m['hotel.create.ready']()
+                                : m['hotel.create.hint']()}
               </p>
             </div>
             <aside className="hl-preview">

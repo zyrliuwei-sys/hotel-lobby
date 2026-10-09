@@ -24,7 +24,7 @@ const copy = {
     stepsTitle: 'How it works',
     steps: [
       'Upload one clear portrait for each person.',
-      'Get a free watermarked preview of you both in the booth.',
+      'Choose a plan to generate your scene and full duet video in the booth.',
       'Happy with it? Animate it — your MP4 with audio is ready in about 3–5 minutes.',
     ],
     credits: (n: number) =>
@@ -44,7 +44,7 @@ const copy = {
     stepsTitle: '三步出片',
     steps: [
       '为两个人各上传一张清晰的正脸照。',
-      '免费生成一张带水印的预览，看看你们在录音棚里的样子。',
+      '选择套餐，生成你们在录音棚里的场景和完整对唱视频。',
       '满意就点生成视频，约 3–5 分钟拿到带音频的 MP4。',
     ],
     credits: (n: number) =>

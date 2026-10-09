@@ -1,7 +1,4 @@
-/**
- * Shared helpers for the free-preview routes: visitor identity (IP hash +
- * device cookie) and the admin-tunable limits.
- */
+/** Shared helpers for legacy preview lookups and the disabled preview route. */
 
 import { getUuid, md5 } from '@/lib/hash';
 
@@ -9,29 +6,9 @@ export const DEVICE_COOKIE = 'hl_did';
 export const FREE_PREVIEW_USED = 'FREE_PREVIEW_USED';
 export const FREE_PREVIEW_PAUSED = 'FREE_PREVIEW_PAUSED';
 
-// ~$0.02 each; real traffic is 80+/day, and when the cap is hit every new
-// visitor loses the free preview (the main conversion step), so keep headroom.
-const DEFAULT_DAILY_CAP = 200;
-const DEFAULT_PER_VISITOR = 1;
-
-function readNumber(value: string | undefined, fallback: number) {
-  if (value === undefined || value.trim() === '') return fallback;
-  const n = Number(value);
-  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
-}
-
-/** 0 for either limit switches free previews off. */
-export function previewLimits(configs: Record<string, string>) {
-  return {
-    dailyCap: readNumber(
-      configs.hotel_lobby_free_preview_cap,
-      DEFAULT_DAILY_CAP
-    ),
-    perVisitor: readNumber(
-      configs.hotel_lobby_free_preview_per_visitor,
-      DEFAULT_PER_VISITOR
-    ),
-  };
+/** Free image previews are disabled; generation starts from the paid flow. */
+export function previewLimits(_configs: Record<string, string>) {
+  return { dailyCap: 0, perVisitor: 0 };
 }
 
 // cf-connecting-ip is set by Cloudflare and can't be forged by the client,

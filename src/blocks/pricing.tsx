@@ -202,11 +202,6 @@ export function Pricing({
       key: 'one-time',
       label: m['landing.pricing.one_time'](),
       plans: [
-        plan('pack_single', {
-          name: m['landing.pricing.pack_single'](),
-          description: m['landing.pricing.pack_single_desc'](),
-          extra: packExtra,
-        }),
         plan('pack_starter', {
           name: m['landing.pricing.pack_starter'](),
           description: m['landing.pricing.pack_desc'](),

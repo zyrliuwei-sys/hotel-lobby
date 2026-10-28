@@ -6,6 +6,7 @@ import {
   Copy,
   Download,
   Loader2,
+  Mic,
   Upload,
   X,
 } from 'lucide-react';
@@ -1116,6 +1117,71 @@ export function HotelLobbyPage() {
           </div>
         </section>
 
+        <section className="hl-guides" aria-labelledby="guides-heading">
+          <div className="hl-section-intro">
+            <p className="hl-kicker">{m['hotel.guides.eyebrow']()}</p>
+            <h2 id="guides-heading">{m['hotel.guides.title']()}</h2>
+          </div>
+          <div className="hl-guides-grid">
+            {[
+              {
+                slug: 'how-to-do-the-ai-trend-hotel-lobby',
+                title: m['hotel.guides.trend.title'],
+                label: m['hotel.guides.trend.label'],
+              },
+              {
+                slug: 'how-to-make-the-hotel-lobby-ai-video',
+                title: m['hotel.guides.video.title'],
+                label: m['hotel.guides.video.label'],
+              },
+              {
+                slug: 'hotel-lobby-meaning',
+                title: m['hotel.guides.meaning.title'],
+                label: m['hotel.guides.meaning.label'],
+              },
+              {
+                slug: 'hotel-lobby-capcut-template',
+                title: m['hotel.guides.capcut.title'],
+                label: m['hotel.guides.capcut.label'],
+              },
+            ].map((guide) => (
+              <Link
+                key={guide.slug}
+                href={`/blog/${guide.slug}`}
+                className="hl-guide-card"
+              >
+                <div className="hl-guide-cover">
+                  <div className="hl-guide-cover-copy">
+                    <span className="hl-guide-cover-brand">
+                      <img
+                        src={envConfigs.app_logo}
+                        alt=""
+                        width={16}
+                        height={16}
+                      />
+                      {envConfigs.app_name}
+                    </span>
+                    <span className="hl-guide-cover-tag">
+                      {m['hotel.guides.badge']()}
+                    </span>
+                    <h3>{guide.title()}</h3>
+                  </div>
+                  <div className="hl-guide-cover-art" aria-hidden="true">
+                    <Mic size={40} strokeWidth={2.2} />
+                    <Mic size={40} strokeWidth={2.2} />
+                  </div>
+                </div>
+                <div className="hl-guide-card-body">
+                  <p>{guide.label()}</p>
+                  <span>
+                    {m['hotel.guides.read']()} <ArrowRight size={16} />
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
         <section className="hl-bottom">
           <h2>{m['hotel.bottom.title']()}</h2>
           <p>{m['hotel.bottom.text']()}</p>
@@ -1140,6 +1206,7 @@ export function HotelLobbyPage() {
         </div>
         <div className="hl-footer-links">
           <a href="mailto:support@hotel-lobby.org">support@hotel-lobby.org</a>
+          <Link href="/blog">{m['hotel.guides.title']()}</Link>
           <Link href="/privacy-policy">{m['landing.footer.privacy']()}</Link>
           <Link href="/terms-of-service">{m['landing.footer.terms']()}</Link>
           <Link href="/acceptable-use-policy">{m['landing.footer.aup']()}</Link>

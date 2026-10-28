@@ -1134,5 +1134,17 @@
   "admin.funnel.footnote.history": "上线以来流量：浏览器页面浏览和访问来自 Cloudflare Web Analytics（只有真实浏览器会发送的 JS 信标，爬虫不计入），由 scripts/sync-traffic.ts 导入。它是抽样数据：页面浏览比较稳定；访问（从站外进入的页面加载）在当前流量下只是粗略估算，所以不用它算转化率。免费预览 = 不同设备数（该功能只在 10/2–10/9 开放）。注册、发起结账（创建过订单的不同用户）、付费人数和收入来自用户表和订单表。「排除 CN/HK」只从页面浏览和访问里扣掉这两个地区。",
   "admin.funnel.history.signup_to_checkout": "注册 → 发起结账",
   "admin.funnel.history.rev_per_signup": "注册人均收入",
-  "admin.funnel.footnote.history_referrer": "来源网站取自浏览器的 Referer。ChatGPT 会去掉它，所以从 ChatGPT 点进来的大多显示为直接访问；判断 ChatGPT 来的人以用户表里的 utm_source（chatgpt.com）为准。/admin 后台页面不计入流量和页面排行。"
+  "admin.funnel.footnote.history_referrer": "来源网站取自浏览器的 Referer。ChatGPT 会去掉它，所以从 ChatGPT 点进来的大多显示为直接访问；判断 ChatGPT 来的人以用户表里的 utm_source（chatgpt.com）为准。/admin 后台页面不计入流量和页面排行。",
+  "hotel.guides.eyebrow": "玩法指南",
+  "hotel.guides.title": "指南",
+  "hotel.guides.badge": "指南",
+  "hotel.guides.read": "阅读",
+  "hotel.guides.trend.title": "How Do You Do the AI Trend Hotel Lobby? A Step-by-Step Guide",
+  "hotel.guides.trend.label": "如何玩 Hotel Lobby AI 潮流",
+  "hotel.guides.video.title": "How to Make the Hotel Lobby AI Video: Photos, Prompts and Fixes",
+  "hotel.guides.video.label": "如何制作 Hotel Lobby AI 视频",
+  "hotel.guides.meaning.title": "Hotel Lobby Meaning: The Quavo & Takeoff Song Behind the AI Trend",
+  "hotel.guides.meaning.label": "Hotel Lobby 这首歌的来历",
+  "hotel.guides.capcut.title": "Hotel Lobby CapCut Template: Where to Find It + an Easier Way",
+  "hotel.guides.capcut.label": "Hotel Lobby 剪映模板"
 }

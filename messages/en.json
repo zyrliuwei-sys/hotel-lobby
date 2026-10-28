@@ -1134,5 +1134,17 @@
   "admin.funnel.footnote.history": "Traffic since launch: browser page views and visits come from Cloudflare Web Analytics (a JS beacon only real browsers send, so crawlers are excluded) imported by scripts/sync-traffic.ts. It is sampled: page views are the steadier number; visits (page loads arriving from outside the site) are a rough estimate at this traffic level, so no conversion rate is computed from them. Free previews = distinct devices (the feature ran Oct 2–9). Sign-ups, started checkout (distinct users who created an order), payers and revenue come from the user and order tables. The CN/HK switch only removes those countries from page views and visits.",
   "admin.funnel.history.signup_to_checkout": "Sign-up → checkout",
   "admin.funnel.history.rev_per_signup": "Revenue / sign-up",
-  "admin.funnel.footnote.history_referrer": "Referrers come from the browser's Referer header. ChatGPT strips it, so most ChatGPT clicks show as direct here; the user table's utm_source (chatgpt.com) is the reliable ChatGPT signal. /admin pages are excluded from traffic and the top pages list."
+  "admin.funnel.footnote.history_referrer": "Referrers come from the browser's Referer header. ChatGPT strips it, so most ChatGPT clicks show as direct here; the user table's utm_source (chatgpt.com) is the reliable ChatGPT signal. /admin pages are excluded from traffic and the top pages list.",
+  "hotel.guides.eyebrow": "LEARN THE TREND",
+  "hotel.guides.title": "Guides",
+  "hotel.guides.badge": "Guide",
+  "hotel.guides.read": "Read",
+  "hotel.guides.trend.title": "How Do You Do the AI Trend Hotel Lobby? A Step-by-Step Guide",
+  "hotel.guides.trend.label": "How to do the Hotel Lobby AI trend",
+  "hotel.guides.video.title": "How to Make the Hotel Lobby AI Video: Photos, Prompts and Fixes",
+  "hotel.guides.video.label": "How to make the Hotel Lobby AI video",
+  "hotel.guides.meaning.title": "Hotel Lobby Meaning: The Quavo & Takeoff Song Behind the AI Trend",
+  "hotel.guides.meaning.label": "The Hotel Lobby song story",
+  "hotel.guides.capcut.title": "Hotel Lobby CapCut Template: Where to Find It + an Easier Way",
+  "hotel.guides.capcut.label": "Hotel Lobby CapCut template"
 }

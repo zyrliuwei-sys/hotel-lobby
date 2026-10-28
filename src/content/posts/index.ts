@@ -12,8 +12,10 @@ import { baseLocale } from '@/paraglide/runtime.js';
  * local posts via the pure helpers below.
  */
 export const BLOG_POST_SLUGS = [
-  'what-is-shipany',
-  'blocks-vs-components',
+  'how-to-do-the-ai-trend-hotel-lobby',
+  'how-to-make-the-hotel-lobby-ai-video',
+  'hotel-lobby-meaning',
+  'hotel-lobby-capcut-template',
 ] as const;
 
 export type BlogPostMeta = {

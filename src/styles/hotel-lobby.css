@@ -1203,3 +1203,117 @@
     font-size: 26px;
   }
 }
+.hl-guides {
+  padding: 126px max(30px, calc((100vw - 1320px) / 2));
+  border-top: 1px solid var(--hl-line);
+}
+.hl-guides-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+@media (max-width: 1100px) {
+  .hl-guides-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .hl-guides-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.hl-guide-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--hl-line);
+  border-radius: 18px;
+  background: var(--hl-surface);
+  color: var(--hl-cream);
+  text-decoration: none;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+.hl-guide-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--hl-copper);
+}
+.hl-guide-cover {
+  display: grid;
+  grid-template-columns: 1fr 42%;
+  gap: 14px;
+  padding: 12px 12px 12px 22px;
+  background: #faf6ef;
+  color: #231c17;
+}
+.hl-guide-cover-copy {
+  display: flex;
+  min-height: 190px;
+  flex-direction: column;
+  padding: 10px 0;
+}
+.hl-guide-cover-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 750;
+}
+.hl-guide-cover-brand img {
+  border-radius: 4px;
+}
+.hl-guide-cover-tag {
+  margin: 20px 0 6px;
+  color: #b8642f;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.hl-guide-cover h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+}
+.hl-guide-cover-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #f08a3e, #d4561a);
+  color: #fff7ef;
+}
+.hl-guide-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 26px 26px;
+}
+.hl-guide-card-body p {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.hl-guide-card-body span {
+  display: inline-flex;
+  margin-top: auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--hl-copper);
+  font-size: 15px;
+  font-weight: 750;
+}
+@media (max-width: 600px) {
+  .hl-guides {
+    padding: 76px 18px;
+  }
+  .hl-guide-card-body p {
+    font-size: 18px;
+  }
+}

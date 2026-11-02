@@ -613,6 +613,13 @@ export function HotelLobbyPage() {
           <a href="#create" onClick={() => setMenu(false)}>
             {m['hotel.nav.create']()}
           </a>
+          <Link
+            href="/sintex-ai"
+            className="hl-nav-syntx"
+            onClick={() => setMenu(false)}
+          >
+            {m['hotel.nav.syntx']()}
+          </Link>
           <a href="#how" onClick={() => setMenu(false)}>
             {m['hotel.nav.how']()}
           </a>

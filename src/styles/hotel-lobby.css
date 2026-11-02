@@ -66,6 +66,12 @@
 .hl-footer a:hover {
   color: var(--hl-cream);
 }
+.hl-nav .hl-nav-syntx {
+  color: var(--hl-copper);
+}
+.hl-nav .hl-nav-syntx:hover {
+  color: var(--hl-cream);
+}
 .hl-nav-cta {
   display: inline-flex;
   min-height: 40px;

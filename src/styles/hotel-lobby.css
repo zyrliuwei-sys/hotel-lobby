@@ -41,6 +41,7 @@
   height: 37px;
   border-radius: 50%;
 }
+.hl-navigation,
 .hl-nav {
   display: flex;
   align-items: center;
@@ -57,12 +58,6 @@
 }
 .hl-nav a:hover,
 .hl-footer a:hover {
-  color: var(--hl-cream);
-}
-.hl-nav .hl-nav-syntx {
-  color: var(--hl-copper);
-}
-.hl-nav .hl-nav-syntx:hover {
   color: var(--hl-cream);
 }
 .hl-nav-cta {
@@ -801,12 +796,19 @@
 @media (max-width: 900px) {
   .hl-header {
     height: 64px;
+    gap: 12px;
     padding: 0 18px;
   }
   .hl-brand {
+    min-width: 0;
     font-size: 15px;
   }
+  .hl-brand span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .hl-brand-mark {
+    flex-shrink: 0;
     width: 34px;
     height: 34px;
   }

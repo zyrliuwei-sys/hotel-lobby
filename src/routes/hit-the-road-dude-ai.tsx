@@ -53,13 +53,13 @@ export const Route = createFileRoute('/hit-the-road-dude-ai')({
               {
                 '@type': 'ListItem',
                 position: 1,
-                name: envConfigs.app_name,
+                name: m['syntx.nav.home']({}, { locale }),
                 item: urlFor(locale, '/'),
               },
               {
                 '@type': 'ListItem',
                 position: 2,
-                name: 'Hit the Road Dude AI',
+                name: m['road_dude.nav.title']({}, { locale }),
                 item: canonical,
               },
             ],

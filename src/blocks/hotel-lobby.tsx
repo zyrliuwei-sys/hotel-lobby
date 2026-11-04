@@ -40,6 +40,7 @@ import { m } from '@/paraglide/messages.js';
 import { localizeHref } from '@/paraglide/runtime.js';
 import { useUserPermissions } from '@/hooks/use-user-permissions';
 import { Pricing } from '@/blocks/pricing';
+import { TrendingVideos } from '@/blocks/video-navigation';
 import { FooterBadgeList } from '@/components/footer-badge-list';
 
 import '@/styles/hotel-lobby.css';
@@ -606,40 +607,29 @@ export function HotelLobbyPage() {
           />
           <span>{envConfigs.app_name}</span>
         </Link>
-        <nav
-          className={menu ? 'hl-nav hl-nav-open' : 'hl-nav'}
-          aria-label={m['hotel.nav_label']()}
-        >
-          <a href="#create" onClick={() => setMenu(false)}>
-            {m['hotel.nav.create']()}
-          </a>
-          <Link
-            href="/sintex-ai"
-            className="hl-nav-syntx"
-            onClick={() => setMenu(false)}
+        <div className="hl-navigation">
+          <TrendingVideos />
+          <nav
+            className={menu ? 'hl-nav hl-nav-open' : 'hl-nav'}
+            aria-label={m['hotel.nav_label']()}
           >
-            {m['hotel.nav.syntx']()}
-          </Link>
-          <Link
-            href="/hit-the-road-dude-ai"
-            className="hl-nav-syntx"
-            onClick={() => setMenu(false)}
-          >
-            {m['road_dude.nav.title']()}
-          </Link>
-          <a href="#how" onClick={() => setMenu(false)}>
-            {m['hotel.nav.how']()}
-          </a>
-          <a href="#ideas" onClick={() => setMenu(false)}>
-            {m['hotel.nav.ideas']()}
-          </a>
-          <a href="#faq" onClick={() => setMenu(false)}>
-            {m['hotel.nav.faq']()}
-          </a>
-          <a href="#pricing" onClick={() => setMenu(false)}>
-            {m['hotel.nav.pricing']()}
-          </a>
-        </nav>
+            <a href="#create" onClick={() => setMenu(false)}>
+              {m['hotel.nav.create']()}
+            </a>
+            <a href="#how" onClick={() => setMenu(false)}>
+              {m['hotel.nav.how']()}
+            </a>
+            <a href="#ideas" onClick={() => setMenu(false)}>
+              {m['hotel.nav.ideas']()}
+            </a>
+            <a href="#faq" onClick={() => setMenu(false)}>
+              {m['hotel.nav.faq']()}
+            </a>
+            <a href="#pricing" onClick={() => setMenu(false)}>
+              {m['hotel.nav.pricing']()}
+            </a>
+          </nav>
+        </div>
         <div className="hl-header-actions">
           {user ? (
             <Suspense fallback={<span className="block size-9" />}>

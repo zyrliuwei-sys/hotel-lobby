@@ -45,6 +45,30 @@ export const Route = createFileRoute('/sintex-ai')({
         })),
         { rel: 'alternate', hrefLang: 'x-default', href: urlFor('en') },
       ],
+      scripts: [
+        {
+          type: 'application/ld+json',
+          children: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              {
+                '@type': 'ListItem',
+                position: 1,
+                name: m['syntx.nav.home']({}, { locale }),
+                item: localizeUrl(new URL('/', envConfigs.app_url), { locale })
+                  .href,
+              },
+              {
+                '@type': 'ListItem',
+                position: 2,
+                name: m['hotel.nav.syntx']({}, { locale }),
+                item: urlFor(locale),
+              },
+            ],
+          }),
+        },
+      ],
     };
   },
   component: SintexPage,

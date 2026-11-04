@@ -1272,7 +1272,6 @@
   "hotel.guides.capcut.title": "Hotel Lobby CapCut Template: Where to Find It + an Easier Way",
   "hotel.guides.capcut.label": "Hotel Lobby CapCut template",
   "road_dude.nav.title": "Hit the Road Dude AI",
-  "road_dude.nav.home": "Hotel Lobby home",
   "road_dude.nav.examples": "Video examples",
   "road_dude.nav.prompt": "Prompt template",
   "road_dude.nav.faq": "FAQ",
@@ -1334,5 +1333,9 @@
   "road_dude.related.link": "Explore Hotel Lobby AI",
   "road_dude.footer.top": "Back to top",
   "road_dude.generator.required": "Required",
-  "road_dude.generator.upload_hint": "Add one JPG or PNG up to 10 MB. Both sides must be at least 360 px."
+  "road_dude.generator.upload_hint": "Add one JPG or PNG up to 10 MB. Both sides must be at least 360 px.",
+  "video_nav.trending": "Trending Videos",
+  "video_nav.sintex": "Text and image to video",
+  "video_nav.road_dude": "Remake the pickup meme",
+  "video_nav.breadcrumb": "Breadcrumb"
 }

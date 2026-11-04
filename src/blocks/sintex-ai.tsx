@@ -43,6 +43,7 @@ import { track } from '@/lib/track';
 import { m } from '@/paraglide/messages.js';
 import { useUserPermissions } from '@/hooks/use-user-permissions';
 import { SintexAiFaq } from '@/blocks/sintex-ai-faq';
+import { VideoBreadcrumb } from '@/blocks/video-navigation';
 import { SiteHeader } from '@/components/site-header';
 
 import '@/styles/syntx-ai.css';
@@ -320,6 +321,10 @@ export function SintexAiPage({ roadDude }: { roadDude?: RoadDudePreset }) {
       />
 
       <main>
+        <VideoBreadcrumb
+          title={m['hotel.nav.syntx']()}
+          className="syntx-breadcrumb"
+        />
         <section className="syntx-hero">
           <div className="syntx-hero-copy">
             <p className="syntx-eyebrow">

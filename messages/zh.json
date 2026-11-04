@@ -1272,7 +1272,6 @@
   "hotel.guides.capcut.title": "Hotel Lobby CapCut Template: Where to Find It + an Easier Way",
   "hotel.guides.capcut.label": "Hotel Lobby 剪映模板",
   "road_dude.nav.title": "Hit the Road Dude AI",
-  "road_dude.nav.home": "返回 Hotel Lobby 首页",
   "road_dude.nav.examples": "视频案例",
   "road_dude.nav.prompt": "提示词模板",
   "road_dude.nav.faq": "常见问题",
@@ -1334,5 +1333,9 @@
   "road_dude.related.link": "体验 Hotel Lobby AI",
   "road_dude.footer.top": "回到顶部",
   "road_dude.generator.required": "必填",
-  "road_dude.generator.upload_hint": "上传一张不超过 10 MB 的 JPG 或 PNG，宽高均至少 360 像素。"
+  "road_dude.generator.upload_hint": "上传一张不超过 10 MB 的 JPG 或 PNG，宽高均至少 360 像素。",
+  "video_nav.trending": "热门视频",
+  "video_nav.sintex": "文生视频与图生视频",
+  "video_nav.road_dude": "翻拍皮卡司机梗",
+  "video_nav.breadcrumb": "面包屑导航"
 }

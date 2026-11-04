@@ -24,7 +24,6 @@
 .road-brand,
 .road-header nav,
 .road-actions,
-.road-back,
 .road-button,
 .road-text-link,
 .road-kicker,
@@ -72,20 +71,7 @@
   grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
   align-items: center;
   gap: clamp(30px, 5vw, 78px);
-  padding-block: 58px 72px;
-}
-
-.road-back {
-  width: fit-content;
-  gap: 7px;
-  margin-bottom: clamp(26px, 4vw, 55px);
-  color: var(--hl-muted);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.road-back:hover {
-  text-decoration: underline;
+  padding-block: 38px 72px;
 }
 
 .road-kicker {
@@ -536,9 +522,6 @@
   }
   .road-hero {
     padding-block: 26px 42px;
-  }
-  .road-back {
-    margin-bottom: 24px;
   }
   .road-page h1 {
     font-size: clamp(70px, 15vw, 103px);

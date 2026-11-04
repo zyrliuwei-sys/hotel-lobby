@@ -57,7 +57,9 @@
 }
 
 .hotel-page,
-.road-page {
+.road-page,
+.video-trends,
+.video-breadcrumb {
   --hl-bg: #191817;
   --hl-surface: #22201e;
   --hl-surface-raised: #292521;

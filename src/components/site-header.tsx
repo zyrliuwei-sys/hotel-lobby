@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ArrowRight, Menu, X } from 'lucide-react';
 
 import { useSession } from '@/core/auth/client';
@@ -26,9 +26,11 @@ const isExternalHref = (href: string) => /^https?:\/\//.test(href);
 export function SiteHeader({
   navLinks,
   logoAlt,
+  featuredNav,
 }: {
   navLinks?: NavLink[];
   logoAlt: string;
+  featuredNav?: ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: session } = useSession();
@@ -50,6 +52,10 @@ export function SiteHeader({
             {envConfigs.app_name}
           </span>
         </Link>
+
+        {featuredNav && (
+          <div className="site-featured-nav mx-2">{featuredNav}</div>
+        )}
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-6 md:flex">

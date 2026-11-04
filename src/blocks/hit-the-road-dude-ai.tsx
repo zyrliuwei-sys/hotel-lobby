@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link as RouterLink } from '@tanstack/react-router';
 import {
   ArrowDown,
-  ArrowLeft,
   ArrowRight,
   ArrowUpRight,
   Check,
@@ -22,6 +21,7 @@ import {
   type RoadDudePreset,
 } from '@/config/hit-the-road-dude-ai';
 import { m } from '@/paraglide/messages.js';
+import { VideoBreadcrumb } from '@/blocks/video-navigation';
 import { LocaleSelector } from '@/components/locale-selector';
 
 import '@/styles/hit-the-road-dude-ai.css';
@@ -84,11 +84,12 @@ export function HitTheRoadDudePage() {
       </header>
 
       <main>
+        <VideoBreadcrumb
+          title={m['road_dude.nav.title']()}
+          className="road-wrap"
+        />
         <section className="road-hero road-wrap" aria-labelledby="road-title">
           <div className="road-hero-copy">
-            <Link href="/" className="road-back">
-              <ArrowLeft size={15} /> {m['road_dude.nav.home']()}
-            </Link>
             <p className="road-kicker">
               <Route size={16} /> {m['road_dude.hero.kicker']()}
             </p>

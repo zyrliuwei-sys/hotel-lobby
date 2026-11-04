@@ -33,8 +33,9 @@ export const Route = createFileRoute('/api/sintex-ai/download')({
           headers: request.headers.has('range')
             ? { range: request.headers.get('range')! }
             : undefined,
-        });
-        if (!upstream.ok) return respErr('Download failed', { status: 502 });
+        }).catch(() => null);
+        if (!upstream?.ok || !upstream.body)
+          return respErr('Download failed', { status: 502 });
         return new Response(upstream.body, {
           status: upstream.status,
           headers: {

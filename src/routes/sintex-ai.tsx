@@ -1,12 +1,20 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { envConfigs } from '@/config';
+import {
+  isRoadDudePreset,
+  type RoadDudePreset,
+} from '@/config/hit-the-road-dude-ai';
 import { SINTEX_VIDEO_EXAMPLES } from '@/config/sintex-ai-media';
 import { m } from '@/paraglide/messages.js';
 import { getLocale, locales, localizeUrl } from '@/paraglide/runtime.js';
 import { SintexAiPage } from '@/blocks/sintex-ai';
 
 export const Route = createFileRoute('/sintex-ai')({
+  validateSearch: (
+    search: Record<string, unknown>
+  ): { roadDude?: RoadDudePreset } =>
+    isRoadDudePreset(search.roadDude) ? { roadDude: search.roadDude } : {},
   loader: () => ({ locale: getLocale() }),
   head: ({ loaderData }) => {
     const locale = loaderData?.locale ?? 'en';
@@ -39,5 +47,10 @@ export const Route = createFileRoute('/sintex-ai')({
       ],
     };
   },
-  component: SintexAiPage,
+  component: SintexPage,
 });
+
+function SintexPage() {
+  const { roadDude } = Route.useSearch();
+  return <SintexAiPage key={roadDude ?? 'default'} roadDude={roadDude} />;
+}

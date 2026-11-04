@@ -620,6 +620,13 @@ export function HotelLobbyPage() {
           >
             {m['hotel.nav.syntx']()}
           </Link>
+          <Link
+            href="/hit-the-road-dude-ai"
+            className="hl-nav-syntx"
+            onClick={() => setMenu(false)}
+          >
+            {m['road_dude.nav.title']()}
+          </Link>
           <a href="#how" onClick={() => setMenu(false)}>
             {m['hotel.nav.how']()}
           </a>
@@ -651,6 +658,7 @@ export function HotelLobbyPage() {
             className="hl-menu"
             onClick={() => setMenu(!menu)}
             aria-label={m['hotel.nav_label']()}
+            aria-expanded={menu}
           >
             {menu ? <X /> : <span>☰</span>}
           </button>

@@ -91,8 +91,9 @@ export async function updateTask(params: {
   taskId: string;
   status: AITaskStatus;
   taskResult?: any;
+  expectedStatus?: string;
 }) {
-  const { taskId, status, taskResult } = params;
+  const { taskId, status, taskResult, expectedStatus } = params;
 
   const [task] = await db()
     .select()
@@ -108,7 +109,16 @@ export async function updateTask(params: {
     updateData.taskResult = JSON.stringify(taskResult);
   }
 
-  await db().update(aiTask).set(updateData).where(eq(aiTask.id, taskId));
+  const update = db().update(aiTask).set(updateData);
+  if (expectedStatus !== undefined) {
+    // Store the new status and its output together. Only the winning poll refunds.
+    const updated = await update
+      .where(and(eq(aiTask.id, taskId), eq(aiTask.status, expectedStatus)))
+      .returning({ id: aiTask.id });
+    if (updated.length === 0) return;
+  } else {
+    await update.where(eq(aiTask.id, taskId));
+  }
 
   // Revoke credits on failure
   if (status === AITaskStatus.FAILED && task.taskInfo) {

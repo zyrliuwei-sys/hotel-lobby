@@ -7,6 +7,7 @@ import { getLocalPosts, mergePosts, type BlogPost } from '@/content/posts';
 const STATIC_PATHS = [
   '',
   '/sintex-ai',
+  '/hit-the-road-dude-ai',
   '/privacy-policy',
   '/terms-of-service',
   '/acceptable-use-policy',

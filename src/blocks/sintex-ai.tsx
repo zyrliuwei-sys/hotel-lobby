@@ -24,6 +24,10 @@ import {
 import { useSession } from '@/core/auth/client';
 import { Link } from '@/core/i18n/navigation';
 import {
+  ROAD_DUDE_PROMPTS,
+  type RoadDudePreset,
+} from '@/config/hit-the-road-dude-ai';
+import {
   SINTEX_REFERENCE_PAGE,
   SINTEX_VIDEO_EXAMPLES,
 } from '@/config/sintex-ai-media';
@@ -47,17 +51,20 @@ type ModelId = SintexModel;
 type AspectId = 'vertical' | 'wide' | 'square';
 type DurationId = SintexDuration;
 
-export function SintexAiPage() {
-  const [prompt, setPrompt] = useState<string>(() =>
-    m['syntx.prompt_example']()
+export function SintexAiPage({ roadDude }: { roadDude?: RoadDudePreset }) {
+  const starterPrompt = roadDude
+    ? ROAD_DUDE_PROMPTS[roadDude]
+    : m['syntx.prompt_example']();
+  const [prompt, setPrompt] = useState<string>(starterPrompt);
+  const [model, setModel] = useState<ModelId>(roadDude ? 'kling' : 'wan');
+  const [aspect, setAspect] = useState<AspectId>(
+    roadDude ? 'vertical' : 'wide'
   );
-  const [model, setModel] = useState<ModelId>('wan');
-  const [aspect, setAspect] = useState<AspectId>('wide');
-  const [duration, setDuration] = useState<DurationId>('5');
+  const [duration, setDuration] = useState<DurationId>(roadDude ? '10' : '5');
   const [referenceUrl, setReferenceUrl] = useState<string | null>(null);
   const [referenceName, setReferenceName] = useState<string | null>(null);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
-  const [taskId, setTaskId] = useState<string>();
+  const [activeTask, setActiveTask] = useState<{ key: string; id: string }>();
   const [inputError, setInputError] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [heroPaused, setHeroPaused] = useState(false);
@@ -66,6 +73,11 @@ export function SintexAiPage() {
   const heroExample = SINTEX_VIDEO_EXAMPLES[0];
   const { data: session, isPending: sessionPending } = useSession();
   const userId = session?.user?.id;
+  const taskStorageKey = userId
+    ? `sintex-task-${userId}${roadDude ? `-road-${roadDude}` : ''}`
+    : undefined;
+  const taskId =
+    activeTask?.key === taskStorageKey ? activeTask?.id : undefined;
   const queryClient = useQueryClient();
   const permissions = useUserPermissions(Boolean(userId));
   const configQuery = useQuery({
@@ -85,9 +97,13 @@ export function SintexAiPage() {
         `/api/sintex-ai/task?id=${encodeURIComponent(taskId!)}`
       ),
     enabled: Boolean(userId && taskId),
+    retry: (attempts, error) =>
+      error.message !== 'Task not found' && attempts < 2,
     refetchInterval: (q) =>
-      q.state.data &&
-      ['success', 'failed', 'canceled'].includes(q.state.data.status)
+      q.state.error?.message === 'Task not found' ||
+      (q.state.data &&
+        (['failed', 'canceled'].includes(q.state.data.status) ||
+          (q.state.data.status === 'success' && q.state.data.videoUrl)))
         ? false
         : 5000,
     refetchIntervalInBackground: true,
@@ -104,7 +120,12 @@ export function SintexAiPage() {
       }),
     onSuccess: (result) => {
       queryClient.setQueryData(['sintex-task', userId, result.id], result);
-      setTaskId(result.id);
+      if (taskStorageKey) {
+        setActiveTask({ key: taskStorageKey, id: result.id });
+        try {
+          localStorage.setItem(taskStorageKey, result.id);
+        } catch {}
+      }
       void balanceQuery.refetch();
     },
     onError: () => {
@@ -117,26 +138,28 @@ export function SintexAiPage() {
     generate.isPending ||
     Boolean(
       taskId &&
-      (!task || !['success', 'failed', 'canceled'].includes(task.status))
+      (!task ||
+        (!['failed', 'canceled'].includes(task.status) &&
+          !(task.status === 'success' && task.videoUrl)))
     );
   const hasPreview = task?.status === 'success' && Boolean(task.videoUrl);
   const price = permissions.data?.isAdmin ? 0 : sintexCredits(model, duration);
 
   useEffect(() => {
-    setTaskId(undefined);
-    if (!userId) return;
+    if (!taskStorageKey) return;
     try {
-      const saved = localStorage.getItem(`sintex-task-${userId}`);
-      if (saved) setTaskId(saved);
+      const saved = localStorage.getItem(taskStorageKey);
+      setActiveTask(saved ? { key: taskStorageKey, id: saved } : undefined);
     } catch {}
-  }, [userId]);
+  }, [taskStorageKey]);
   useEffect(() => {
-    if (!userId) return;
+    if (!taskStorageKey || taskQuery.error?.message !== 'Task not found')
+      return;
+    setActiveTask(undefined);
     try {
-      if (taskId) localStorage.setItem(`sintex-task-${userId}`, taskId);
-      else localStorage.removeItem(`sintex-task-${userId}`);
+      localStorage.removeItem(taskStorageKey);
     } catch {}
-  }, [taskId, userId]);
+  }, [taskQuery.error, taskStorageKey]);
   useEffect(() => {
     if (task?.status === 'success' || task?.status === 'failed')
       void balanceQuery.refetch();
@@ -226,7 +249,8 @@ export function SintexAiPage() {
     event.preventDefault();
     if (!prompt.trim() || isGenerating) return;
 
-    if (!userId || !configQuery.data?.available) return;
+    if (!userId || !configQuery.data?.available || (roadDude && !referenceFile))
+      return;
     setInputError(null);
     setMediaError(null);
     let imageData: string | undefined;
@@ -268,7 +292,12 @@ export function SintexAiPage() {
   }
 
   function resetGenerator() {
-    setTaskId(undefined);
+    setActiveTask(undefined);
+    if (taskStorageKey) {
+      try {
+        localStorage.removeItem(taskStorageKey);
+      } catch {}
+    }
     generate.reset();
     setInputError(null);
     setMediaError(null);
@@ -428,7 +457,7 @@ export function SintexAiPage() {
                   type="button"
                   disabled={isGenerating}
                   className="syntx-inline-action"
-                  onClick={() => setPrompt(m['syntx.prompt_example']())}
+                  onClick={() => setPrompt(starterPrompt)}
                 >
                   {m['syntx.use_example']()}
                   <ArrowUpRight className="size-3.5" />
@@ -442,7 +471,11 @@ export function SintexAiPage() {
                   <span className="syntx-form-index">02</span>
                   <h3>{m['syntx.generator.reference']()}</h3>
                 </div>
-                <span className="syntx-optional">{m['syntx.optional']()}</span>
+                <span className="syntx-optional">
+                  {roadDude
+                    ? m['road_dude.generator.required']()
+                    : m['syntx.optional']()}
+                </span>
               </div>
               <input
                 ref={fileInputRef}
@@ -469,7 +502,11 @@ export function SintexAiPage() {
                   <strong>
                     {referenceName ?? m['syntx.generator.upload']()}
                   </strong>
-                  <small>{m['syntx.generator.upload_hint']()}</small>
+                  <small>
+                    {roadDude
+                      ? m['road_dude.generator.upload_hint']()
+                      : m['syntx.generator.upload_hint']()}
+                  </small>
                 </span>
                 <ArrowUpRight className="syntx-upload-arrow size-4" />
               </button>
@@ -556,7 +593,7 @@ export function SintexAiPage() {
               {!userId && !sessionPending ? (
                 <Link
                   className="syntx-generate-button"
-                  href="/sign-in?callbackUrl=%2Fsintex-ai%23generator"
+                  href={`/sign-in?callbackUrl=${encodeURIComponent(`/sintex-ai${roadDude ? `?roadDude=${roadDude}` : ''}#generator`)}`}
                 >
                   {m['syntx.generator.sign_in']()}{' '}
                   <ArrowRight className="size-4" />
@@ -568,6 +605,7 @@ export function SintexAiPage() {
                   disabled={
                     isGenerating ||
                     !prompt.trim() ||
+                    Boolean(roadDude && !referenceFile) ||
                     sessionPending ||
                     !configQuery.data?.available
                   }

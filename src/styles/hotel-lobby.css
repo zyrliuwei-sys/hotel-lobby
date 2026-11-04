@@ -1,11 +1,4 @@
 .hotel-page {
-  --hl-bg: #191817;
-  --hl-surface: #22201e;
-  --hl-surface-raised: #292521;
-  --hl-line: #494039;
-  --hl-cream: #f2ede4;
-  --hl-muted: #b6a99e;
-  --hl-copper: #c88d68;
   min-height: 100dvh;
   overflow: clip;
   background: var(--hl-bg);
@@ -51,7 +44,7 @@
 .hl-nav {
   display: flex;
   align-items: center;
-  gap: 42px;
+  gap: clamp(14px, 2.2vw, 34px);
 }
 .hl-nav a,
 .hl-footer a {
@@ -211,7 +204,7 @@
   border: 1px solid var(--hl-copper);
   border-radius: 2px;
   background: var(--hl-copper);
-  color: #191511;
+  color: var(--hl-ink);
   text-decoration: none;
   font:
     750 12px 'DM Sans Variable',
@@ -226,8 +219,8 @@
 }
 .hl-button:hover {
   transform: translateY(-2px);
-  border-color: #e2b092;
-  background: #e2b092;
+  border-color: var(--hl-copper-hover);
+  background: var(--hl-copper-hover);
 }
 .hl-create,
 .hl-how,
@@ -805,7 +798,7 @@
     font-size: 19px;
   }
 }
-@media (max-width: 600px) {
+@media (max-width: 900px) {
   .hl-header {
     height: 64px;
     padding: 0 18px;
@@ -836,12 +829,14 @@
   .hl-nav a {
     padding: 13px 0;
   }
-  .hl-nav-cta {
-    display: none;
-  }
   .hl-menu {
     display: grid;
     place-items: center;
+  }
+}
+@media (max-width: 600px) {
+  .hl-nav-cta {
+    display: none;
   }
   .hl-hero {
     display: flex;

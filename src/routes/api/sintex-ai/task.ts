@@ -2,12 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { AIMediaType, FalProvider } from '@/core/ai';
 import { getAuth } from '@/core/auth';
-import {
-  AITaskStatus,
-  claimTaskStatus,
-  findTask,
-  updateTask,
-} from '@/modules/ai-tasks/service';
+import { AITaskStatus, findTask, updateTask } from '@/modules/ai-tasks/service';
 import { getAllConfigs } from '@/modules/config/service';
 import { respData, respErr } from '@/lib/resp';
 
@@ -23,7 +18,10 @@ async function GET({ request }: { request: Request }) {
     const task = id ? await findTask(id) : null;
     if (!task || task.userId !== session.user.id || !isSintexTask(task))
       return respErr('Task not found', { status: 404 });
-    if (['success', 'failed', 'canceled'].includes(task.status))
+    if (
+      ['failed', 'canceled'].includes(task.status) ||
+      (task.status === 'success' && taskView(task).videoUrl)
+    )
       return respData(taskView(task));
     if (!task.taskId) return respData(taskView(task));
     const configs = await getAllConfigs();
@@ -42,18 +40,12 @@ async function GET({ request }: { request: Request }) {
       const message = error instanceof Error ? error.message : '';
       if (!/status: (400|404|410|422)\b/.test(message))
         return respErr('POLL_RETRY', { status: 503 });
-      if (
-        await claimTaskStatus(
-          task.id,
-          task.status as AITaskStatus,
-          AITaskStatus.FAILED
-        )
-      )
-        await updateTask({
-          taskId: task.id,
-          status: AITaskStatus.FAILED,
-          taskResult: { error: 'GENERATION_FAILED' },
-        });
+      await updateTask({
+        taskId: task.id,
+        status: AITaskStatus.FAILED,
+        expectedStatus: task.status,
+        taskResult: { error: 'GENERATION_FAILED' },
+      });
       return respData(taskView((await findTask(task.id))!));
     }
     const status = result.taskStatus as unknown as AITaskStatus;
@@ -66,16 +58,16 @@ async function GET({ request }: { request: Request }) {
       (status === AITaskStatus.SUCCESS &&
         (!payload?.video?.url || !isAllowedVideoUrl(payload.video.url)));
     const nextStatus = failed ? AITaskStatus.FAILED : status;
+    // A queued response may arrive after another poll has observed progress.
     if (
-      nextStatus !== task.status &&
-      !(await claimTaskStatus(task.id, task.status as AITaskStatus, nextStatus))
+      !terminal &&
+      (nextStatus === task.status || nextStatus === AITaskStatus.PENDING)
     )
-      return respData(taskView((await findTask(task.id))!));
-    if (nextStatus === task.status && !terminal)
       return respData(taskView(task));
     await updateTask({
       taskId: task.id,
       status: nextStatus,
+      expectedStatus: task.status,
       taskResult: failed
         ? { error: 'GENERATION_FAILED' }
         : terminal

@@ -56,6 +56,19 @@
     'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', Times, serif;
 }
 
+.hotel-page,
+.road-page {
+  --hl-bg: #191817;
+  --hl-surface: #22201e;
+  --hl-surface-raised: #292521;
+  --hl-line: #494039;
+  --hl-cream: #f2ede4;
+  --hl-muted: #b6a99e;
+  --hl-copper: #c88d68;
+  --hl-copper-hover: #e2b092;
+  --hl-ink: #191511;
+}
+
 @layer base {
   :root,
   .dark {

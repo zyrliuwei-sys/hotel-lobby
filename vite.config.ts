@@ -143,6 +143,24 @@ export default defineConfig({
       srcDirectory: 'src',
     }),
     viteReact(),
+    {
+      name: 'sintex-video-dev-preview',
+      apply: 'serve',
+      configureServer(server) {
+        // Nitro dev sends media requests to static file handling by default.
+        // This URL is an authenticated streaming route.
+        server.middlewares.use((req, _res, next) => {
+          if (
+            req.method === 'GET' &&
+            req.headers['sec-fetch-dest'] === 'video' &&
+            req.url?.split('?', 1)[0] === '/api/sintex-ai/download'
+          ) {
+            req.headers['sec-fetch-dest'] = 'empty';
+          }
+          next();
+        });
+      },
+    },
     // Cloudflare cron → /api/hotel-lobby/cron (finishes tasks whose tab closed).
     nitro({ plugins: ['./src/nitro/cron.ts'] }),
   ],
